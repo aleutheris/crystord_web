@@ -13,7 +13,7 @@ epic; full detail lives in the epic records under `epics/`. Status and lifecycle
 
 | Priority | ID | Title | Status | Record | Related | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
-| 1 | EPIC-260066 | Foundation — App Shell, Slot Registries & Shared Widgets | Ideation | epics/EPIC-260066.md | REQ-FR-260020, REQ-FR-260021, REQ-FR-260034, ADR-260032, REQ-CR-260010, REQ-CR-260011 | Root; all leaves depend on it. Self-contains the product-backlog strategy (substrate vision, five verbs, Q1–Q3, standing constraints). |
+| 1 | EPIC-260066 | Foundation — App Shell, Slot Registries & Shared Widgets | Ready | epics/EPIC-260066.md | REQ-FR-260020, REQ-FR-260021, REQ-FR-260034, ADR-260032, REQ-CR-260010, REQ-CR-260011 | Root; all leaves depend on it. Self-contains the product-backlog strategy (substrate vision, five verbs, Q1–Q3, standing constraints). Ready since 2026-06-30 (plan review); tasks T1–T9 defined. |
 | 2 | EPIC-260067 | Classify Inspector — label & category chip editors | Ideation | epics/EPIC-260067.md | REQ-CR-260011 | bet #1; Inspector "Classify" tab; depends on EPIC-260066. |
 | 3 | EPIC-260068 | Categories Navigator — left-rail faceted tree | Ideation | epics/EPIC-260068.md | — | bet #2; Q2 inline taxonomy + permission seam; depends on EPIC-260066. |
 | 4 | EPIC-260069 | Compute — formula builder & Flow visualization | Ideation | epics/EPIC-260069.md | REQ-CR-260010 | bet #4; Q3 differentiator; no charts (potential future ICR on REQ-CR-260010); depends on EPIC-260066. |
