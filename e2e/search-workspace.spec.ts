@@ -146,15 +146,15 @@ test.describe('Search and discoverability', () => {
     await expect(page.getByRole('button', { name: 'Task' })).toBeVisible()
   })
 
-  test('typing alone does not trigger search or show result panel', async ({ page }) => {
+  test('typing alone does not trigger search', async ({ page }) => {
     await mockGraphQL(page)
     await signIn(page)
 
     await page.getByLabel(/search labels/i).fill('proj')
 
-    // Typing alone must not show results or query summary
-    await expect(page.getByRole('complementary', { name: /search results/i })).not.toBeVisible()
+    // Typing alone must not run a query — no active query summary, no atoms in the graph
     await expect(page.getByRole('status', { name: /active query/i })).not.toBeVisible()
+    await expect(page.getByText('Alpha', { exact: true })).not.toBeVisible()
   })
 
   test('committing label chip and submitting shows backend-filtered results', async ({ page }) => {
@@ -172,11 +172,11 @@ test.describe('Search and discoverability', () => {
     await page.keyboard.press('Enter')
     await retrieveResponse
 
-    // Result panel appears with backend-filtered atoms (Alpha and Gamma have Project label)
-    await expect(page.getByRole('complementary', { name: /search results/i })).toBeVisible()
+    // Backend-filtered atoms (Alpha and Gamma have the Project label) appear in the graph and the
+    // query summary becomes active. (The result list returns with the Table view, EPIC-260071.)
     await expect(page.getByRole('status', { name: /active query/i })).toBeVisible()
-    await expect(page.getByRole('complementary', { name: /search results/i }).getByText('Alpha')).toBeVisible()
-    await expect(page.getByRole('complementary', { name: /search results/i }).getByText('Gamma')).toBeVisible()
+    await expect(page.getByText('Alpha', { exact: true })).toBeVisible()
+    await expect(page.getByText('Gamma', { exact: true })).toBeVisible()
   })
 
   test('label chip filter scopes results via backend query', async ({ page }) => {
@@ -195,7 +195,7 @@ test.describe('Search and discoverability', () => {
     await retrieveResponse
 
     await expect(page.getByText('1 result')).toBeVisible()
-    await expect(page.getByRole('complementary', { name: /search results/i }).getByText('Beta')).toBeVisible()
+    await expect(page.getByText('Beta', { exact: true })).toBeVisible()
   })
 
   test('clicking a search result selects the atom', async ({ page }) => {
@@ -214,8 +214,7 @@ test.describe('Search and discoverability', () => {
     await page.keyboard.press('Enter')
     await retrieveResponse
 
-    const resultPanel = page.getByRole('complementary', { name: /search results/i })
-    await resultPanel.getByText('Beta').click()
+    await page.getByText('Beta', { exact: true }).click()
 
     // Detail panel opens for the clicked atom
     const detailPanel = page.getByRole('complementary', { name: /atom details/i })
@@ -223,7 +222,7 @@ test.describe('Search and discoverability', () => {
     await expect(detailPanel.getByLabel(/title/i)).toHaveValue('Beta')
   })
 
-  test('clear button removes search and hides result panel', async ({ page }) => {
+  test('clear button removes the active search query', async ({ page }) => {
     await mockGraphQL(page)
     await signIn(page)
 
@@ -239,12 +238,13 @@ test.describe('Search and discoverability', () => {
     await page.keyboard.press('Enter')
     await retrieveResponse
 
-    await expect(page.getByRole('complementary', { name: /search results/i })).toBeVisible()
+    await expect(page.getByText('Beta', { exact: true })).toBeVisible()
     await expect(page.getByRole('status', { name: /active query/i })).toBeVisible()
 
     await page.getByLabel(/clear search/i).click()
 
-    await expect(page.getByRole('complementary', { name: /search results/i })).not.toBeVisible()
+    // Clear removes the active query summary; the graph retains the last results until the next
+    // search (the result-list representation returns with the Table view, EPIC-260071).
     await expect(page.getByRole('status', { name: /active query/i })).not.toBeVisible()
   })
 
@@ -368,8 +368,8 @@ test.describe('Search and discoverability', () => {
     // Text was auto-chipped before submit
     await expect(page.getByRole('button', { name: /remove project/i })).toBeVisible()
     await expect(searchInput).toHaveValue('')
-    // Backend results shown (Project atoms)
-    await expect(page.getByRole('complementary', { name: /search results/i })).toBeVisible()
+    // Backend results shown (Project atoms appear in the graph)
+    await expect(page.getByText('Alpha', { exact: true })).toBeVisible()
   })
 
   test('committed chips plus typed label on Enter submits all labels', async ({ page }) => {

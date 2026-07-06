@@ -21,6 +21,7 @@ Nothing in this directory imports from a feature module. Feature modules may fre
 | `feedback/` | `feedback.types.ts` | Dialog, Toast, Spinner |
 | `layout/` | `layout.types.ts` | Card, Panel |
 | `typography/` | `typography.types.ts` | Heading (h1–h6), Label, BodyText |
+| `widgets/` | `widgets.types.ts` | FilterBuilder, CategoryTree, LabelChipEditor — shared filtering & taxonomy widgets (EPIC-260066 T8) |
 
 ## How to Add a Template
 

@@ -24,7 +24,7 @@ Status lifecycle used here: Proposed | Accepted | Superseded.
 | ADR-260028 | Dual Graph View Scope and UX Baseline | Accepted | 2026-05-12 | - | - | Defines Network/Flow view model, Network-first default, shared dataset rendering, and shell-preserving scope boundary. |
 | ADR-260030 | Dual-View Shared State and Large-Graph Degrade Behavior Baseline | Accepted | 2026-05-12 | - | - | Defines shared dataset/selection state, centralized mutation reflection, and large-result degrade thresholds. |
 | ADR-260031 | Dual-View Accessibility and Usability Baseline | Accepted | 2026-05-12 | - | - | Defines keyboard navigation, ARIA tab semantics, focus visibility, non-color state cues, and legend/tooltip guidance. |
-| ADR-260032 | Dual-View Delivery, Validation, and Rollout Baseline | Accepted | 2026-05-12 | - | - | Defines required test layers, performance targets, and feature-flag rollout/rollback policy. |
+| ADR-260032 | Dual-View Delivery, Validation, and Rollout Baseline | Accepted | 2026-05-12 | - | - | Defines required test layers, performance targets, and feature-flag rollout/rollback policy. Extended by ADR-260061 (shell registries / WorkspaceContext / node seam; selection moves props→context). |
 | ADR-260033 | Geometric Closest-Point Bond Anchoring for Network View | Accepted | 2026-05-13 | - | - | Refines Network-view bond anchoring to geometric nearest-boundary points and preserves optional label seam. |
 | ADR-260034 | Directional Arrowheads for Network-View Bonds | Accepted | 2026-05-13 | - | - | Establishes target-end arrowheads as baseline directional cue and keeps label rendering optional/off-by-default seam. |
 | ADR-260035 | Force-Directed Automatic Layout for Network View | Accepted | 2026-05-13 | - | - | Selects d3-force as layout engine, synchronous iteration-capped pre-render, drag-position preservation, and grid fallback above 400 nodes. |
@@ -47,6 +47,7 @@ Status lifecycle used here: Proposed | Accepted | Superseded.
 | ADR-260058 | Account-Management Surface, Google Re-Linking, and Password Reset | Accepted | 2026-06-23 | - | - | Password reset in S1; AUTH-GOOGLE-NOT-LINKED recovery; new account-settings module (replaces AdminPlaceholder) hosting me/setPassword/unlink/linkGoogle/email-change/revokeAllSessions/delete. |
 | ADR-260059 | Read-Side Authorization via Atom Access Level | Accepted | 2026-06-23 | - | - | Gates edit/delete/bond affordances on AtomOutput.accessLevel (OWNER/EDITOR/VIEWER); handles AU-UNAUTHORIZED and CR-16-PRINCIPAL-UNKNOWN; sharing-write out of scope. |
 | ADR-260060 | Coverage Is Measured, Not Gated | Accepted | 2026-06-24 | - | - | Adds @vitest/coverage-v8 + npm run test:coverage (measure-only); no enforced threshold; new auth/authz modules held to 100% line+branch by review per REQ-QR-260008. |
+| ADR-260061 | Application Shell — Slot Registries, Workspace Context, and Node-Extension Seam | Accepted | 2026-06-30 | - | - | Foundation (EPIC-260066) shell architecture: four-region shell with static typed slot registries (navigators/views/inspector tabs) in `ui-shell` — compile-time, not a runtime plugin system (REQ-CR-260010); shell-owned `WorkspaceContext` (working set/selection/preferences, selection moves props→context); `AtomNodeData` layered node seam. Extends ADR-260032; reconciles ADR-260051 (`ui-primitives` widget home). |
 
 ## Superseded
 

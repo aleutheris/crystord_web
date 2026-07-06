@@ -1,17 +1,20 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { ReactFlowProvider } from '@xyflow/react'
 import { useLogout, useAuth } from '../features/auth-entry'
 import { AccountSettingsPanel } from '../features/account-settings'
-import { GraphCanvas, NetworkCanvas, useGraphData, DeleteConfirmDialog, useGraphDegrade } from '../features/workspace-graph'
-import { DetailPanel, CreationNotification } from '../features/workspace-details'
-import { SearchBar, QuerySummary, SearchResultPanel, useSearch, useRecommendedLabels } from '../features/workspace-search'
+import { useGraphData, DeleteConfirmDialog, useGraphDegrade } from '../features/workspace-graph'
+import { CreationNotification } from '../features/workspace-details'
+import { SearchBar, QuerySummary, useSearch, useRecommendedLabels } from '../features/workspace-search'
 import { AtomCreationOverlay } from './AtomCreationOverlay'
 import { BetaBanner } from './BetaBanner'
 import { GraphViewTabs } from './GraphViewTabs'
 import { GraphRenderGate } from './GraphRenderGate'
 import { GraphLegend } from './GraphLegend'
-import type { GraphView } from './GraphViewTabs'
-import { networkViewEnabled } from '../feature-flags'
+import { LeftRail } from './LeftRail'
+import { enabledViews } from './slots'
+import { WorkspaceProvider, type WorkspaceContextValue } from './workspace-context'
+import { usePreferences } from './use-preferences'
+import { Inspector } from './Inspector'
 import { ThemeToggle } from '../styles/ThemeToggle'
 import { C_BORDER } from '../styles/tokens'
 
@@ -21,9 +24,10 @@ export function WorkspaceShell({ googleClientId }: { googleClientId?: string }) 
   const graphData = useGraphData()
   const search = useSearch(graphData.atoms, graphData.search)
   const recommendedLabels = useRecommendedLabels()
+  const preferences = usePreferences()
   const [selectedAtomId, setSelectedAtomId] = useState<string | null>(null)
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
-  const [activeView, setActiveView] = useState<GraphView>(networkViewEnabled ? 'network' : 'flow')
+  const [activeView, setActiveView] = useState<string>(enabledViews[0]?.id ?? 'flow')
   const { mode: renderMode, confirmRender } = useGraphDegrade(graphData.atoms.length)
   const [isCreatingAtom, setIsCreatingAtom] = useState(false)
   const [creationSuccessMsg, setCreationSuccessMsg] = useState<string | null>(null)
@@ -52,7 +56,22 @@ export function WorkspaceShell({ googleClientId }: { googleClientId?: string }) 
     setCreationSuccessMsg(`Atom "${title}" created successfully.`)
   }
 
+  // Center view-host: render the active view from the registry's enabled views (ADR-260061).
+  // Invariant: Flow is unconditionally enabled in slots/view-registry.ts, so enabledViews is never
+  // empty and activeView is always a valid id — the `?? enabledViews[0]!` fallback (like L30's
+  // `?? 'flow'`) is a defensive no-op. If a future epic ever gates Flow, this assertion and the
+  // EPIC-260066/T9 coverage exemption must be revisited (the empty state would crash here).
+  const ActiveView = (enabledViews.find((v) => v.id === activeView) ?? enabledViews[0]!).Component
+
+  // Shell-owned workspace state (selection + working set), provided via context (ADR-260061 / T3).
+  const workspace = useMemo<WorkspaceContextValue>(() => ({
+    selection: { selectedAtomId, selectedAtom, select: setSelectedAtomId },
+    workingSet: { atoms: graphData.atoms },
+    preferences,
+  }), [selectedAtomId, selectedAtom, graphData.atoms, preferences])
+
   return (
+    <WorkspaceProvider value={workspace}>
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
       <BetaBanner />
       <header style={{ padding: '0.5rem 1rem', borderBottom: `1px solid ${C_BORDER}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem' }}>
@@ -71,15 +90,9 @@ export function WorkspaceShell({ googleClientId }: { googleClientId?: string }) 
       <QuerySummary summary={search.querySummary} resultCount={graphData.atoms.length} />
       <ReactFlowProvider>
         <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
-          {search.querySummary.length > 0 && (
-            <SearchResultPanel
-              atoms={graphData.atoms}
-              selectedAtomId={selectedAtomId}
-              onSelectAtom={setSelectedAtomId}
-            />
-          )}
+          <LeftRail />
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-            {networkViewEnabled && <GraphViewTabs activeView={activeView} onViewChange={setActiveView} />}
+            {enabledViews.length > 1 && <GraphViewTabs views={enabledViews} activeView={activeView} onViewChange={setActiveView} />}
             <div
               id="tabpanel-graph"
               role="tabpanel"
@@ -92,36 +105,21 @@ export function WorkspaceShell({ googleClientId }: { googleClientId?: string }) 
                 mode={renderMode}
                 onConfirm={confirmRender}
               >
-                {activeView === 'network' ? (
-                  <NetworkCanvas
-                    data={graphData}
-                    selectedAtomId={selectedAtomId}
-                    onSelectAtom={setSelectedAtomId}
-                    onCreateAtom={() => setIsCreatingAtom(true)}
-                    renderMode={canvasMode}
-                  />
-                ) : (
-                  <GraphCanvas
-                    data={graphData}
-                    selectedAtomId={selectedAtomId}
-                    onSelectAtom={setSelectedAtomId}
-                    onCreateAtom={() => setIsCreatingAtom(true)}
-                    renderMode={canvasMode}
-                  />
-                )}
+                <ActiveView
+                  data={graphData}
+                  selectedAtomId={selectedAtomId}
+                  onSelectAtom={setSelectedAtomId}
+                  onCreateAtom={() => setIsCreatingAtom(true)}
+                  renderMode={canvasMode}
+                />
               </GraphRenderGate>
             </div>
 
           </div>
-          {selectedAtom && (
-            <DetailPanel
-              key={selectedAtom.properties.shellies.uuid}
-              atom={selectedAtom}
-              onUpdate={graphData.updateAtom}
-              onDelete={(id) => setPendingDeleteId(id)}
-              onClose={() => setSelectedAtomId(null)}
-            />
-          )}
+          <Inspector
+            onUpdate={graphData.updateAtom}
+            onDelete={(id) => setPendingDeleteId(id)}
+          />
         </div>
       </ReactFlowProvider>
       {pendingDeleteAtom && (
@@ -151,5 +149,6 @@ export function WorkspaceShell({ googleClientId }: { googleClientId?: string }) 
         />
       )}
     </div>
+    </WorkspaceProvider>
   )
 }

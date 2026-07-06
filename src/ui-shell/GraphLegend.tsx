@@ -1,12 +1,11 @@
 import { useState } from 'react'
-import type { GraphView } from './GraphViewTabs'
 import { C_BG, C_BORDER, C_TEXT, C_TEXT_SECONDARY } from '../styles/tokens'
 
 interface GraphLegendProps {
-  view: GraphView
+  view: string
 }
 
-const NODE_LABEL: Record<GraphView, string> = {
+const NODE_LABEL: Record<string, string> = {
   network: 'Circle = atom (data entity)',
   flow: 'Rectangle = atom (data entity)',
 }
@@ -60,7 +59,7 @@ export function GraphLegend({ view }: GraphLegendProps) {
           style={{ margin: 0, padding: '0 0.6rem 0.5rem', display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '0.15rem 0.5rem' }}
         >
           <dt style={{ fontWeight: 600, color: C_TEXT_SECONDARY, whiteSpace: 'nowrap' }}>Node</dt>
-          <dd style={{ margin: 0 }}>{NODE_LABEL[view]}</dd>
+          <dd style={{ margin: 0 }}>{NODE_LABEL[view] ?? 'Atom (data entity)'}</dd>
 
           <dt style={{ fontWeight: 600, color: C_TEXT_SECONDARY }}>Edge</dt>
           <dd style={{ margin: 0 }}>Line = bond (relationship)</dd>

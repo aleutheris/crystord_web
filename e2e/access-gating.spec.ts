@@ -68,7 +68,9 @@ async function signInAndSearch(page: Page) {
 }
 
 async function openDetail(page: Page, title: string) {
-  await page.getByRole('complementary', { name: /search results/i }).getByText(title, { exact: true }).click()
+  // Select the atom from the graph (the left-rail result list was retired in EPIC-260066 T5;
+  // the list representation returns with the Table view, EPIC-260071).
+  await page.getByText(title, { exact: true }).click()
   const detail = page.getByRole('complementary', { name: /atom details/i })
   await expect(detail).toBeVisible()
   await expect(detail.getByLabel(/title/i)).toHaveValue(title)

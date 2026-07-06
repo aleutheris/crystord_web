@@ -440,11 +440,194 @@ describe('Graph-first workflow support (H2)', () => {
   it('workspace shell composes graph/search/detail for integrated workflow', () => {
     const shell = fs.readFileSync(path.join(SRC, 'ui-shell', 'WorkspaceShell.tsx'), 'utf-8')
 
-    expect(shell).toContain('GraphCanvas')
+    // Search is composed directly; graph views + the detail/inspector are composed through
+    // the slot registries (ADR-260061 / EPIC-260066 T2).
     expect(shell).toContain('SearchBar')
-    expect(shell).toContain('DetailPanel')
     expect(shell).toContain('ReactFlowProvider')
+    expect(shell).toContain("from './slots'")
+    const viewReg = fs.readFileSync(path.join(SRC, 'ui-shell', 'slots', 'view-registry.ts'), 'utf-8')
+    const inspectorReg = fs.readFileSync(path.join(SRC, 'ui-shell', 'slots', 'inspector-registry.ts'), 'utf-8')
+    expect(viewReg).toContain('GraphCanvas')
+    expect(inspectorReg).toContain('DetailPanel')
   })
+})
+
+describe('Application shell slot registries (ADR-260061 / EPIC-260066 T2)', () => {
+  const SLOTS = path.join(SRC, 'ui-shell', 'slots')
+
+  it('the three slot registries and their typed contracts exist', () => {
+    for (const f of ['slot-types.ts', 'view-registry.ts', 'inspector-registry.ts', 'navigator-registry.ts', 'index.ts']) {
+      expect(fs.existsSync(path.join(SLOTS, f))).toBe(true)
+    }
+  })
+
+  it('slot contracts are typed (View/InspectorTab/Navigator descriptors + props)', () => {
+    const types = fs.readFileSync(path.join(SLOTS, 'slot-types.ts'), 'utf-8')
+    expect(types).toContain('ViewProps')
+    expect(types).toContain('ViewDescriptor')
+    expect(types).toContain('InspectorTabDescriptor')
+    expect(types).toContain('NavigatorDescriptor')
+  })
+
+  it('views and inspector registries compose feature components via barrels', () => {
+    const viewReg = fs.readFileSync(path.join(SLOTS, 'view-registry.ts'), 'utf-8')
+    const inspectorReg = fs.readFileSync(path.join(SLOTS, 'inspector-registry.ts'), 'utf-8')
+    expect(viewReg).toContain('GraphCanvas')
+    expect(viewReg).toContain('NetworkCanvas')
+    expect(viewReg).toMatch(/from '\.\.\/\.\.\/features\/workspace-graph'/)
+    expect(inspectorReg).toContain('DetailPanel')
+    expect(inspectorReg).toMatch(/from '\.\.\/\.\.\/features\/workspace-details'/)
+  })
+
+  it('WorkspaceShell renders the active view and inspector through the registries', () => {
+    const shell = fs.readFileSync(path.join(SRC, 'ui-shell', 'WorkspaceShell.tsx'), 'utf-8')
+    expect(shell).toMatch(/import \{ enabledViews \} from '\.\/slots'/)
+    expect(shell).toMatch(/<Inspector/)
+    expect(shell).not.toMatch(/<GraphCanvas/)
+    expect(shell).not.toMatch(/<NetworkCanvas/)
+    // The inspector host renders the active tab from the registry.
+    const inspector = fs.readFileSync(path.join(SRC, 'ui-shell', 'Inspector.tsx'), 'utf-8')
+    expect(inspector).toContain('inspectorTabs')
+  })
+})
+
+describe('Workspace preferences store (ADR-260061 / EPIC-260066 T4 / Q3)', () => {
+  it('preferences store exposes homeEmphasis/computeBadges with compute/always defaults', () => {
+    const prefs = fs.readFileSync(path.join(SRC, 'ui-shell', 'use-preferences.ts'), 'utf-8')
+    expect(prefs).toContain('homeEmphasis')
+    expect(prefs).toContain('computeBadges')
+    // Q3 lean (compute-as-differentiator): defaults ship in the foundation, consumed by EPIC-260069.
+    expect(prefs).toMatch(/DEFAULT_HOME_EMPHASIS[^\n]*'compute'/)
+    expect(prefs).toMatch(/DEFAULT_COMPUTE_BADGES[^\n]*'always'/)
+  })
+
+  it('preferences are localStorage-backed (modeled on ThemeProvider)', () => {
+    const prefs = fs.readFileSync(path.join(SRC, 'ui-shell', 'use-preferences.ts'), 'utf-8')
+    expect(prefs).toContain('localStorage')
+  })
+
+  it('preferences are exposed on the WorkspaceContext', () => {
+    const ctx = fs.readFileSync(path.join(SRC, 'ui-shell', 'workspace-context.tsx'), 'utf-8')
+    expect(ctx).toContain('preferences')
+    expect(ctx).toContain('WorkspacePreferences')
+  })
+})
+
+describe('Left rail and navigator slot (ADR-260061 / EPIC-260066 T5)', () => {
+  it('navigator registry includes the Labels navigator', () => {
+    const reg = fs.readFileSync(path.join(SRC, 'ui-shell', 'slots', 'navigator-registry.ts'), 'utf-8')
+    expect(reg).toContain('LabelsNavigator')
+    expect(reg).toMatch(/id:\s*'labels'/)
+  })
+
+  it('WorkspaceShell renders the collapsible LeftRail and no longer the SearchResultPanel', () => {
+    const shell = fs.readFileSync(path.join(SRC, 'ui-shell', 'WorkspaceShell.tsx'), 'utf-8')
+    expect(shell).toMatch(/<LeftRail/)
+    expect(shell).not.toContain('SearchResultPanel')
+  })
+
+  it('LeftRail consumes the workspace context, the navigator registry, and the collapse preference', () => {
+    const rail = fs.readFileSync(path.join(SRC, 'ui-shell', 'LeftRail.tsx'), 'utf-8')
+    expect(rail).toContain('useWorkspace')
+    expect(rail).toContain('navigators')
+    expect(rail).toContain('leftRailCollapsed')
+  })
+})
+
+describe('Tabbed inspector (ADR-260061 / EPIC-260066 T6)', () => {
+  it('Inspector renders a tab strip from the registry plus a tabpanel', () => {
+    const inspector = fs.readFileSync(path.join(SRC, 'ui-shell', 'Inspector.tsx'), 'utf-8')
+    expect(inspector).toContain('inspectorTabs')
+    expect(inspector).toMatch(/role="tablist"/)
+    expect(inspector).toMatch(/role="tab"/)
+    expect(inspector).toMatch(/role="tabpanel"/)
+  })
+
+  it('Inspector is collapsible via the rightRailCollapsed preference', () => {
+    const inspector = fs.readFileSync(path.join(SRC, 'ui-shell', 'Inspector.tsx'), 'utf-8')
+    expect(inspector).toContain('rightRailCollapsed')
+    expect(inspector).toMatch(/aria-label="Collapse inspector"/)
+    expect(inspector).toMatch(/aria-label="Expand inspector"/)
+  })
+
+  it('Inspector tablist supports arrow-key navigation (WAI-ARIA tabs, mirrors GraphViewTabs)', () => {
+    const inspector = fs.readFileSync(path.join(SRC, 'ui-shell', 'Inspector.tsx'), 'utf-8')
+    expect(inspector).toMatch(/onKeyDown/)
+    expect(inspector).toMatch(/ArrowRight/)
+    expect(inspector).toMatch(/ArrowLeft/)
+  })
+})
+
+describe('Node-extension seam (ADR-260061 / EPIC-260066 T7)', () => {
+  it('AtomNode exposes the stable AtomNodeData contract via the barrel', () => {
+    const node = fs.readFileSync(path.join(FEATURES, 'workspace-graph', 'AtomNode.tsx'), 'utf-8')
+    expect(node).toMatch(/export interface AtomNodeData/)
+    const barrel = fs.readFileSync(path.join(FEATURES, 'workspace-graph', 'index.ts'), 'utf-8')
+    expect(barrel).toContain('AtomNodeData')
+  })
+
+  it('AtomNode is composed of named regions (badges + body) keyed on the extension points', () => {
+    const node = fs.readFileSync(path.join(FEATURES, 'workspace-graph', 'AtomNode.tsx'), 'utf-8')
+    expect(node).toContain('NodeBadges')
+    expect(node).toContain('NodeBody')
+    // Badges region is gated on the compute extension point (EPIC-260069); body documents LOD (EPIC-260072).
+    expect(node).toContain('computeStatus')
+    expect(node).toContain('lod')
+    expect(node).toMatch(/data-node-region="badges"/)
+  })
+})
+
+describe('Shared filtering & taxonomy widgets (ADR-260061 / EPIC-260066 T8)', () => {
+  const WIDGETS = path.join(SRC, 'ui-primitives', 'widgets')
+
+  it('the widget kit and its contracts exist in ui-primitives', () => {
+    for (const f of ['widgets.types.ts', 'LabelChipEditor.tsx', 'CategoryTree.tsx', 'FilterBuilder.tsx', 'index.ts']) {
+      expect(fs.existsSync(path.join(WIDGETS, f))).toBe(true)
+    }
+  })
+
+  it('defines the shared filter and category-tree contracts', () => {
+    const types = fs.readFileSync(path.join(WIDGETS, 'widgets.types.ts'), 'utf-8')
+    expect(types).toMatch(/interface WorkspaceFilter/)
+    expect(types).toMatch(/interface CategoryFacetFilter/)
+    expect(types).toMatch(/interface CategoryTreeNode/)
+    // Permission seam (Q2): the tree carries an optional canEditNode predicate.
+    expect(types).toMatch(/canEditNode\?/)
+  })
+
+  it('widgets are exported from the ui-primitives barrel', () => {
+    const barrel = fs.readFileSync(path.join(SRC, 'ui-primitives', 'index.ts'), 'utf-8')
+    expect(barrel).toContain('FilterBuilder')
+    expect(barrel).toContain('CategoryTree')
+    expect(barrel).toContain('LabelChipEditor')
+  })
+
+})
+
+describe('ui-primitives boundary — styles-only imports (ADR-260051)', () => {
+  const UI_PRIMITIVES = path.join(SRC, 'ui-primitives')
+  const STYLES = path.join(SRC, 'styles')
+  // Primitives may import only React, the styles tokens, or other primitives — never a feature,
+  // api-contract, ui-shell, or any other module. Enforced across the whole directory (not a
+  // hardcoded file list), so every future primitive inherits the guard.
+  const ALLOWED_BARE = new Set(['react'])
+
+  for (const file of collectTsFiles(UI_PRIMITIVES)) {
+    const rel = path.relative(SRC, file)
+    it(`${rel} imports only react, styles, or within ui-primitives`, () => {
+      for (const imp of extractImports(file)) {
+        if (imp.startsWith('.')) {
+          const resolved = path.resolve(path.dirname(file), imp)
+          expect(
+            resolved.startsWith(UI_PRIMITIVES) || resolved.startsWith(STYLES),
+            `${rel} imports '${imp}' outside ui-primitives/styles`,
+          ).toBe(true)
+        } else {
+          expect(ALLOWED_BARE.has(imp), `${rel} imports disallowed package '${imp}'`).toBe(true)
+        }
+      }
+    })
+  }
 })
 
 // --- BI-260017: Delivery and quality baseline (I1-I6) ---
@@ -753,10 +936,11 @@ describe('Extension seam preservation (J1 / REQ-FR-260020)', () => {
 
   it('workspace shell composes features — seam for collaboration overlay', () => {
     const shell = fs.readFileSync(path.join(SRC, 'ui-shell', 'WorkspaceShell.tsx'), 'utf-8')
-    // Major feature compositions are imported via barrel
-    expect(shell).toContain('GraphCanvas')
+    // Search composed directly; views + inspector composed via the slot registries (ADR-260061)
     expect(shell).toContain('SearchBar')
-    expect(shell).toContain('DetailPanel')
+    expect(shell).toContain("from './slots'")
+    const viewReg = fs.readFileSync(path.join(SRC, 'ui-shell', 'slots', 'view-registry.ts'), 'utf-8')
+    expect(viewReg).toContain('GraphCanvas')
   })
 })
 
@@ -1124,16 +1308,19 @@ describe('Feature flag rollout control (D3 / REQ-OR-260011)', () => {
     expect(flags).toContain('import.meta.env')
   })
 
-  it('WorkspaceShell imports networkViewEnabled from feature-flags', () => {
-    const shell = fs.readFileSync(path.join(SRC, 'ui-shell', 'WorkspaceShell.tsx'), 'utf-8')
-    expect(shell).toContain('networkViewEnabled')
-    expect(shell).toContain('feature-flags')
+  it('view registry gates the Network view behind networkViewEnabled', () => {
+    const viewReg = fs.readFileSync(path.join(SRC, 'ui-shell', 'slots', 'view-registry.ts'), 'utf-8')
+    expect(viewReg).toContain('networkViewEnabled')
+    expect(viewReg).toMatch(/from '\.\.\/\.\.\/feature-flags'/)
+    // Network is gated by the flag; Flow is unconditionally available (ADR-260061 / EPIC-260066).
+    expect(viewReg).toMatch(/enabled:\s*networkViewEnabled/)
   })
 
-  it('WorkspaceShell gates GraphViewTabs rendering behind networkViewEnabled', () => {
+  it('WorkspaceShell gates the tab bar on the registry-enabled view set', () => {
     const shell = fs.readFileSync(path.join(SRC, 'ui-shell', 'WorkspaceShell.tsx'), 'utf-8')
-    // Flag guards tab rendering — both identifiers appear in the same conditional expression
-    expect(shell).toMatch(/networkViewEnabled[\s\S]{0,40}GraphViewTabs/)
+    // The tab bar renders only when more than one view is enabled — driven by the registry's
+    // enabled set, not a hardcoded flag in the shell (ADR-260061 / EPIC-260066).
+    expect(shell).toMatch(/enabledViews[\s\S]{0,40}GraphViewTabs/)
   })
 
   it('Flow view remains always available as immediate fallback (GraphCanvas in barrel)', () => {
@@ -1141,27 +1328,39 @@ describe('Feature flag rollout control (D3 / REQ-OR-260011)', () => {
     expect(barrel).toContain('GraphCanvas')
   })
 
-  it('default view falls back to Flow when networkViewEnabled is false (initialised from flag)', () => {
+  it('default view is the first enabled view (Flow when Network is gated off)', () => {
     const shell = fs.readFileSync(path.join(SRC, 'ui-shell', 'WorkspaceShell.tsx'), 'utf-8')
-    // useState initialiser references the flag so the default view is flag-driven
-    expect(shell).toMatch(/useState.*networkViewEnabled/)
+    // Default is the first enabled view; with Network gated off by the flag, Flow remains.
+    expect(shell).toMatch(/useState<string>\(enabledViews\[0\]/)
   })
 })
 
 describe('Shared-state dual-view architecture (D1 / REQ-FR-260034)', () => {
-  it('selectedAtomId is lifted to WorkspaceShell and passed to both canvases', () => {
+  it('selection is owned by WorkspaceContext, provided by the shell, shared with views (props) and hosts (context)', () => {
+    const ctx = fs.readFileSync(path.join(SRC, 'ui-shell', 'workspace-context.tsx'), 'utf-8')
+    expect(ctx).toContain('WorkspaceProvider')
+    expect(ctx).toContain('useWorkspace')
+    expect(ctx).toMatch(/selectedAtomId/)
     const shell = fs.readFileSync(path.join(SRC, 'ui-shell', 'WorkspaceShell.tsx'), 'utf-8')
-    expect(shell).toContain('selectedAtomId')
-    expect(shell).toMatch(/GraphCanvas[\s\S]{0,200}selectedAtomId/)
-    expect(shell).toMatch(/NetworkCanvas[\s\S]{0,200}selectedAtomId/)
+    // Shell owns the single selection state and provides it via the context.
+    expect(shell).toContain('WorkspaceProvider')
+    // Feature views still receive the shared selection via ViewProps (features cannot import ui-shell).
+    expect(shell).toMatch(/selectedAtomId=\{selectedAtomId\}/)
+    const slotTypes = fs.readFileSync(path.join(SRC, 'ui-shell', 'slots', 'slot-types.ts'), 'utf-8')
+    expect(slotTypes).toMatch(/ViewProps[\s\S]*selectedAtomId/)
+    // ui-shell host (Inspector) consumes selection from context, not props.
+    const inspector = fs.readFileSync(path.join(SRC, 'ui-shell', 'Inspector.tsx'), 'utf-8')
+    expect(inspector).toContain('useWorkspace')
   })
 
-  it('single useGraphData call feeds both canvas views', () => {
+  it('single useGraphData call feeds the registry-rendered view-host', () => {
     const shell = fs.readFileSync(path.join(SRC, 'ui-shell', 'WorkspaceShell.tsx'), 'utf-8')
     const hookCallCount = (shell.match(/useGraphData\(\)/g) ?? []).length
     expect(hookCallCount).toBe(1)
+    // One render site passes the single source to whichever view is active — structurally one
+    // source, not per-view fetching (the >=2 form was a proxy when both canvases were inlined).
     const dataPropCount = (shell.match(/data=\{graphData\}/g) ?? []).length
-    expect(dataPropCount).toBeGreaterThanOrEqual(2)
+    expect(dataPropCount).toBeGreaterThanOrEqual(1)
   })
 
   it('mutations update shared atoms state so all views reflect changes', () => {
@@ -1812,14 +2011,10 @@ describe('Detail-panel identity consistency (BI-260043 / REQ-QR-260004)', () => 
     expect(shell).toMatch(/selectedAtomId/)
   })
 
-  it('DetailPanel renders only when selectedAtom is non-null', () => {
-    const shell = fs.readFileSync(path.join(SRC, 'ui-shell', 'WorkspaceShell.tsx'), 'utf-8')
-    expect(shell).toMatch(/selectedAtom\s*&&/)
-  })
-
-  it('SearchResultPanel onSelectAtom is wired to the canonical setSelectedAtomId', () => {
-    const shell = fs.readFileSync(path.join(SRC, 'ui-shell', 'WorkspaceShell.tsx'), 'utf-8')
-    expect(shell).toMatch(/SearchResultPanel[\s\S]{0,300}onSelectAtom=\{setSelectedAtomId\}/)
+  it('Inspector renders a tab only when an atom is selected (guards on context selection)', () => {
+    const inspector = fs.readFileSync(path.join(SRC, 'ui-shell', 'Inspector.tsx'), 'utf-8')
+    expect(inspector).toContain('useWorkspace')
+    expect(inspector).toMatch(/if \(!atom\) return null/)
   })
 })
 

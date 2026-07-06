@@ -58,4 +58,14 @@ describe('AtomNode', () => {
     render(<AtomNode {...makeProps({ title: 'Alpha', labels: ['Tag'], isNonFlowAtom: true }, true)} />)
     expect(screen.getByText('Alpha')).toBeInTheDocument()
   })
+
+  it('keeps the badges region empty by default — no behavior change (no computeStatus)', () => {
+    const { container } = render(<AtomNode {...makeProps({ title: 'Alpha', labels: [] })} />)
+    expect(container.querySelector('[data-node-region="badges"]')).toBeNull()
+  })
+
+  it('exposes the badges-region seam when computeStatus is present (EPIC-260069 fills it)', () => {
+    const { container } = render(<AtomNode {...makeProps({ title: 'Alpha', labels: [], computeStatus: 'ok' })} />)
+    expect(container.querySelector('[data-node-region="badges"]')).not.toBeNull()
+  })
 })

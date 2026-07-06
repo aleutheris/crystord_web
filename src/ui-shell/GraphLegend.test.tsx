@@ -49,4 +49,9 @@ describe('GraphLegend', () => {
     render(<GraphLegend view="flow" />)
     expect(screen.getByText(/Bold outline/)).toBeInTheDocument()
   })
+
+  it('falls back to a generic node label for an unknown view', () => {
+    render(<GraphLegend view="table" />)
+    expect(screen.getByText('Atom (data entity)')).toBeInTheDocument()
+  })
 })
