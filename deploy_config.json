@@ -12,7 +12,7 @@
       "oauthClient": "development"
     },
     "aleuhouse": {
-      "graphqlEndpoint": "https://crystord.aleutheris.com/api",
+      "graphqlEndpoint": "https://engine.crystord.com/api",
       "backendSchemaRange": "~9.2.0",
       "oauthClient": "production"
     },
