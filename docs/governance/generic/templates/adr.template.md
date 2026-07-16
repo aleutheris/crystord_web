@@ -1,12 +1,5 @@
 # ADR-YYNNNN: <decision-title>
 
-## Workflow
-
-- The LLM drafts ADR proposals for human review, typically in chat first.
-- The ADR is recorded in this structure only after human acceptance (or stored as Proposed until decision).
-- Keep status accurate over time: `Proposed → Accepted`, then a terminal status if it leaves force.
-- On a terminal status, move this file to `adr/superseded/` per `docs/governance/generic/process/artifact-model.md`.
-
 Status: Proposed | Accepted | Superseded by <id> | Rejected | Withdrawn
 Date: <yyyy-mm-dd>
 Owners: <names>

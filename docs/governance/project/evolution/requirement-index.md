@@ -112,6 +112,7 @@ A terminal requirement (`Superseded by <id>` / `Withdrawn`) keeps a tombstone ro
 | REQ-CR-260025 | Centralized GraphQL Error-Code Interpretation | CR | Proposed | ADR-260057 | BI-260054 |
 | REQ-CR-260026 | Rate-Limit Handling and Back-Off | CR | Proposed | ADR-260057 | BI-260056 |
 | REQ-QR-260008 | Authentication & Authorization Security, Reliability, and Coverage | QR | Proposed | ADR-260054 | BI-260054, BI-260055, BI-260056, BI-260057, BI-260058, BI-260059, BI-260060, BI-260061 |
+| REQ-FR-260070 | Table View as a Registered Center View with Inline Editing | FR | Active | ADR-260062, ADR-260032 | EPIC-260071 |
 
 ## Superseded
 
