@@ -12,6 +12,7 @@ function atom(uuid: string, title: string, accessLevel: 'OWNER' | 'EDITOR' | 'VI
     bonds: [],
     ownerUuid: 'owner-x',
     accessLevel,
+    categories: [],
     properties: {
       shellies: { uuid },
       nuclearies: { title, description: 'D', content: 'C', operation: '', constants: {} },

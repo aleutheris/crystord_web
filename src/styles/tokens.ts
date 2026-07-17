@@ -34,6 +34,22 @@ export const C_TOAST_ACTION = 'var(--color-toast-action)'
 
 export const C_CONNECTION_LINE = 'var(--color-connection-line)'
 
+/**
+ * Deterministic label-chip palette (ADR-260063 / EPIC-260067). 8 desaturated, brand-adjacent
+ * hues with light/dark variants in tokens.css; indexed via `labelColorIndex` in
+ * `label-colors.ts` so the same label gets the same color everywhere (node dots reuse it).
+ */
+export const C_LABEL_PALETTE: readonly string[] = [
+  'var(--label-chip-1)',
+  'var(--label-chip-2)',
+  'var(--label-chip-3)',
+  'var(--label-chip-4)',
+  'var(--label-chip-5)',
+  'var(--label-chip-6)',
+  'var(--label-chip-7)',
+  'var(--label-chip-8)',
+]
+
 export const C_CHIP_BG = 'var(--color-chip-bg)'
 export const C_CHIP_BORDER = 'var(--color-chip-border)'
 export const C_CHIP_TEXT = 'var(--color-chip-text)'

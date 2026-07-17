@@ -206,6 +206,77 @@ describe('useGraphData bond mutations', () => {
   })
 })
 
+describe('useGraphData category round-trip (ADR-260063 / EPIC-260067)', () => {
+  const baseAtom = {
+    labels: ['Project'],
+    bonds: [],
+    properties: {
+      shellies: { uuid: 'u1' },
+      nuclearies: { title: 'A', description: '', content: '', operation: '', constants: {} },
+    },
+  }
+
+  it('updateAtom maps atom.categories to replace-all [{ valueKey }] inputs', async () => {
+    mockMutate.mockResolvedValue({ data: { change: ['u1'] } })
+    mockQuery.mockResolvedValue(emptyRetrieve)
+    const { result } = renderHook(() => useGraphData())
+
+    const atom = {
+      ...baseAtom,
+      categories: [
+        { dimensionKey: 'region', valueKey: 'belgium' },
+        { dimensionKey: 'period', valueKey: 'q1' },
+      ],
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await act(() => result.current.updateAtom('u1', atom as any))
+
+    const updateCall = mockMutate.mock.calls.find(
+      ([args]) => args.mutation === UPDATE_ATOM_MUTATION,
+    )
+    expect(updateCall?.[0].variables.inputs[0].categories).toEqual([
+      { valueKey: 'belgium' },
+      { valueKey: 'q1' },
+    ])
+  })
+
+  it('updateAtom sends an empty categories array as an explicit clear-all', async () => {
+    mockMutate.mockResolvedValue({ data: { change: ['u1'] } })
+    mockQuery.mockResolvedValue(emptyRetrieve)
+    const { result } = renderHook(() => useGraphData())
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await act(() => result.current.updateAtom('u1', { ...baseAtom, categories: [] } as any))
+
+    const updateCall = mockMutate.mock.calls.find(
+      ([args]) => args.mutation === UPDATE_ATOM_MUTATION,
+    )
+    expect(updateCall?.[0].variables.inputs[0].categories).toEqual([])
+  })
+
+  it('updateAtom omits the categories field entirely for an atom without categories', async () => {
+    mockMutate.mockResolvedValue({ data: { change: ['u1'] } })
+    mockQuery.mockResolvedValue(emptyRetrieve)
+    const { result } = renderHook(() => useGraphData())
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await act(() => result.current.updateAtom('u1', baseAtom as any))
+
+    const updateCall = mockMutate.mock.calls.find(
+      ([args]) => args.mutation === UPDATE_ATOM_MUTATION,
+    )
+    // Omitted (not null/[]): replace-all semantics mean a present field would wipe assignments.
+    expect(updateCall?.[0].variables.inputs[0]).not.toHaveProperty('categories')
+  })
+
+  it('RETRIEVE_QUERY selects the category assignments so atoms round-trip them', () => {
+    const printed = RETRIEVE_QUERY.loc?.source.body ?? ''
+    expect(printed).toContain('categories')
+    expect(printed).toContain('dimensionKey')
+    expect(printed).toContain('valueKey')
+  })
+})
+
 describe('useGraphData access-error handling (BI-260061 / REQ-FR-260069)', () => {
   const atom = {
     labels: ['P'],

@@ -29,7 +29,7 @@ function extractImports(filePath: string): string[] {
   return matches.map(m => m[1]!)
 }
 
-const FEATURE_MODULES = ['auth-entry', 'workspace-graph', 'workspace-search', 'workspace-details', 'workspace-table', 'account-settings']
+const FEATURE_MODULES = ['auth-entry', 'workspace-graph', 'workspace-search', 'workspace-details', 'workspace-table', 'workspace-classify', 'account-settings']
 
 describe('Architecture boundary checks', () => {
   describe('dependency direction — no cross-feature imports', () => {
@@ -211,6 +211,7 @@ describe('Contract stability — barrel export checks (G5)', () => {
     'workspace-search': ['SearchBar', 'QuerySummary', 'SearchResultPanel', 'useSearch', 'SearchState', 'SearchFilters'],
     'workspace-details': ['DetailPanel'],
     'workspace-table': ['TableView'],
+    'workspace-classify': ['ClassifyTab'],
     'account-settings': ['AccountSettingsPanel'],
   }
 
@@ -2804,5 +2805,63 @@ describe('Table view registration — tri-view center host (ADR-260062 / EPIC-26
     // The legend describes nodes/edges; it must be gated to the canvas views, not the tabpanel.
     expect(shell).toMatch(/'flow'[\s\S]{0,60}<GraphLegend|<GraphLegend[\s\S]{0,60}'flow'/)
     expect(shell).toMatch(/activeView === 'flow' \|\| activeView === 'network'/)
+  })
+})
+
+// --- EPIC-260067: Classify inspector — label & category chip editors (ADR-260063 / REQ-FR-260071) ---
+
+describe('Classify inspector registration and contracts (ADR-260063 / EPIC-260067)', () => {
+  it('inspector registry registers the Classify tab from the workspace-classify barrel, after Details', () => {
+    const inspectorReg = fs.readFileSync(path.join(SRC, 'ui-shell', 'slots', 'inspector-registry.ts'), 'utf-8')
+    expect(inspectorReg).toContain('ClassifyTab')
+    expect(inspectorReg).toMatch(/id:\s*'classify'/)
+    expect(inspectorReg).toMatch(/from '\.\.\/\.\.\/features\/workspace-classify'/)
+    expect(inspectorReg.indexOf("id: 'classify'")).toBeGreaterThan(inspectorReg.indexOf("id: 'details'"))
+  })
+
+  it('RETRIEVE_QUERY selects the category assignments (dimensionKey + valueKey)', () => {
+    const queries = fs.readFileSync(path.join(SRC, 'api-contract', 'graph-queries.ts'), 'utf-8')
+    expect(queries).toContain('categories')
+    expect(queries).toContain('valueKey')
+    expect(queries).toContain('dimensionKey')
+  })
+
+  it('the DetailPanel comma-box is gone (Classify owns labels in edit mode)', () => {
+    const detailPanel = fs.readFileSync(path.join(FEATURES, 'workspace-details', 'DetailPanel.tsx'), 'utf-8')
+    expect(detailPanel).not.toContain('comma-separated')
+    // Creation mode still needs labels (`change` requires them) — via the shared chip editor.
+    expect(detailPanel).toContain('LabelChipEditor')
+  })
+
+  it('the 8-slot label-chip palette exists in the light root and both dark blocks', () => {
+    const tokensCss = fs.readFileSync(path.join(SRC, 'styles', 'tokens.css'), 'utf-8')
+    expect(tokensCss).toContain('--label-chip-1')
+    expect(tokensCss).toContain('--label-chip-8')
+    // Dark-theme coverage: the explicit dark block and the prefers-color-scheme block both
+    // define the palette (same structure as every other token).
+    const darkBlock = tokensCss.slice(tokensCss.indexOf('[data-theme="dark"]'))
+    expect(darkBlock).toContain('--label-chip-8')
+    const mediaDarkBlock = tokensCss.slice(tokensCss.indexOf('prefers-color-scheme: dark'))
+    expect(mediaDarkBlock).toContain('--label-chip-8')
+  })
+
+  it('the deterministic hash helper lives in src/styles and is exported', () => {
+    const labelColors = fs.readFileSync(path.join(SRC, 'styles', 'label-colors.ts'), 'utf-8')
+    expect(labelColors).toContain('export function labelColorIndex')
+    expect(labelColors).toContain('export function labelColorToken')
+    const tokens = fs.readFileSync(path.join(SRC, 'styles', 'tokens.ts'), 'utf-8')
+    expect(tokens).toContain('C_LABEL_PALETTE')
+  })
+
+  it('ClassifyTab declares a local props slice (no ui-shell import) and aria-labels its sections', () => {
+    const tabPath = path.join(FEATURES, 'workspace-classify', 'ClassifyTab.tsx')
+    for (const imp of extractImports(tabPath)) {
+      expect(imp).not.toContain('ui-shell')
+    }
+    const tab = fs.readFileSync(tabPath, 'utf-8')
+    expect(tab).toMatch(/interface ClassifyTabProps/)
+    expect(tab).toMatch(/aria-label="Labels"/)
+    const section = fs.readFileSync(path.join(FEATURES, 'workspace-classify', 'CategoriesSection.tsx'), 'utf-8')
+    expect(section).toMatch(/aria-label="Categories"/)
   })
 })

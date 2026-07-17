@@ -7,6 +7,7 @@ function mockGraphQL(page: import('@playwright/test').Page) {
       bonds: [{ uuid: 'atom-2', name: 'DEPENDS_ON', direction: 'from' }],
       ownerUuid: 'owner-1',
       accessLevel: 'OWNER',
+      categories: [],
       properties: {
         shellies: { uuid: 'atom-1' },
         nuclearies: { title: 'Alpha', description: 'First', content: 'Active', operation: '', constants: {} },
@@ -17,6 +18,7 @@ function mockGraphQL(page: import('@playwright/test').Page) {
       bonds: [],
       ownerUuid: 'owner-1',
       accessLevel: 'OWNER',
+      categories: [],
       properties: {
         shellies: { uuid: 'atom-2' },
         nuclearies: { title: 'Beta', description: 'Second', content: 'Pending', operation: '', constants: {} },
@@ -27,6 +29,7 @@ function mockGraphQL(page: import('@playwright/test').Page) {
       bonds: [],
       ownerUuid: 'owner-1',
       accessLevel: 'OWNER',
+      categories: [],
       properties: {
         shellies: { uuid: 'atom-3' },
         nuclearies: { title: 'Gamma', description: 'Third', content: 'Done', operation: '', constants: {} },
@@ -283,6 +286,7 @@ test.describe('Search and discoverability', () => {
       bonds: [],
       ownerUuid: 'owner-1',
       accessLevel: 'OWNER',
+      categories: [],
       properties: {
         shellies: { uuid: 'atom-2' },
         nuclearies: { title: 'Beta', description: 'Second', content: 'Pending', operation: '', constants: {} },

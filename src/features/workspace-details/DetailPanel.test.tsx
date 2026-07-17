@@ -36,7 +36,9 @@ describe('DetailPanel — edit mode', () => {
     expect(screen.getByLabelText(/title/i)).toHaveValue('Test Atom')
     expect(screen.getByLabelText(/description/i)).toHaveValue('A test description')
     expect(screen.getByLabelText(/content/i)).toHaveValue('Some content')
-    expect(screen.getByLabelText(/labels/i)).toHaveValue('Project')
+    // No labels field in edit mode — the Classify tab owns labels (ADR-260063 / EPIC-260067).
+    expect(screen.queryByLabelText(/labels/i)).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Add label')).not.toBeInTheDocument()
   })
 
   it('calls onUpdate with modified data on save', async () => {
@@ -56,6 +58,8 @@ describe('DetailPanel — edit mode', () => {
     const [uuid, atom] = onUpdate.mock.calls[0]!
     expect(uuid).toBe('test-uuid-1')
     expect(atom.properties.nuclearies.title).toBe('Updated Title')
+    // The saved atom keeps its labels untouched — Classify owns label edits (ADR-260063).
+    expect(atom.labels).toEqual(['Project'])
   })
 
   it('calls onDelete when delete button is clicked', async () => {
@@ -160,7 +164,9 @@ describe('DetailPanel — creation mode', () => {
       <DetailPanel isCreationMode={true} onCreate={vi.fn()} onClose={vi.fn()} />,
     )
     expect(screen.getByLabelText(/title/i)).toHaveValue('')
-    expect(screen.getByLabelText(/labels/i)).toHaveValue('')
+    // Creation labels use the shared chip editor (ADR-260063): empty input, no chips yet.
+    expect(screen.getByLabelText('Add label')).toHaveValue('')
+    expect(screen.queryByRole('button', { name: /^remove /i })).not.toBeInTheDocument()
     expect(screen.getByLabelText(/description/i)).toHaveValue('')
     expect(screen.getByLabelText(/content/i)).toHaveValue('')
   })
@@ -189,7 +195,7 @@ describe('DetailPanel — creation mode', () => {
     )
 
     await user.type(screen.getByLabelText(/title/i), 'New Node')
-    await user.type(screen.getByLabelText(/labels/i), 'Tag1, Tag2')
+    await user.type(screen.getByLabelText('Add label'), 'Tag1{Enter}Tag2{Enter}')
     await user.type(screen.getByLabelText(/description/i), 'My description')
     await user.type(screen.getByLabelText(/content/i), 'My content')
     await user.click(screen.getByRole('button', { name: /^create$/i }))
@@ -200,6 +206,22 @@ describe('DetailPanel — creation mode', () => {
     expect(labels).toEqual(['Tag1', 'Tag2'])
     expect(description).toBe('My description')
     expect(content).toBe('My content')
+  })
+
+  it('removing a chip in creation mode drops the label from the created atom', async () => {
+    const onCreate = vi.fn().mockResolvedValue(undefined)
+    const user = userEvent.setup()
+
+    render(
+      <DetailPanel isCreationMode={true} onCreate={onCreate} onClose={vi.fn()} />,
+    )
+
+    await user.type(screen.getByLabelText(/title/i), 'New Node')
+    await user.type(screen.getByLabelText('Add label'), 'Tag1{Enter}Tag2{Enter}')
+    await user.click(screen.getByRole('button', { name: 'Remove Tag1' }))
+    await user.click(screen.getByRole('button', { name: /^create$/i }))
+
+    expect(onCreate.mock.calls[0]![1]).toEqual(['Tag2'])
   })
 
   it('calls onClose when close button is clicked in creation mode', async () => {

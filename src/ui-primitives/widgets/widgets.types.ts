@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import type { CSSProperties, ReactNode } from 'react'
 
 /**
  * Shared filtering & taxonomy widget contracts (ADR-260061 / EPIC-260066 T8).
@@ -45,6 +45,11 @@ export interface LabelChipEditorProps {
   placeholder?: string
   ariaLabel?: string
   classNames?: LabelChipEditorClassNames
+  /**
+   * Per-chip inline style seam (ADR-260063): lets the caller tint chips (e.g. the deterministic
+   * label palette) without the widget knowing about color policy. Merged over classNames styling.
+   */
+  chipStyle?: (label: string) => CSSProperties | undefined
 }
 
 export interface CategoryTreeClassNames {

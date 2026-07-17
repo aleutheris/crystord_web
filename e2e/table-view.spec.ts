@@ -9,6 +9,7 @@ function mockGraphQL(page: import('@playwright/test').Page) {
       bonds: [],
       ownerUuid: 'owner-1',
       accessLevel: 'OWNER',
+      categories: [],
       properties: {
         shellies: { uuid: 'atom-1' },
         nuclearies: { title: 'Alpha', description: 'First', content: 'Alpha body', operation: '', constants: {} },
@@ -19,6 +20,7 @@ function mockGraphQL(page: import('@playwright/test').Page) {
       bonds: [],
       ownerUuid: 'owner-1',
       accessLevel: 'OWNER',
+      categories: [],
       properties: {
         shellies: { uuid: 'atom-2' },
         nuclearies: { title: 'Gamma', description: 'Computed', content: '42', operation: '{"name":"SUM","args":[]}', constants: {} },
@@ -29,6 +31,7 @@ function mockGraphQL(page: import('@playwright/test').Page) {
       bonds: [],
       ownerUuid: 'owner-2',
       accessLevel: 'VIEWER',
+      categories: [],
       properties: {
         shellies: { uuid: 'atom-3' },
         nuclearies: { title: 'Beta', description: 'Shared read-only', content: 'Beta body', operation: '', constants: {} },

@@ -7,6 +7,7 @@ function mockGraphQL(page: import('@playwright/test').Page) {
       bonds: [{ uuid: 'atom-2', name: 'DEPENDS_ON', direction: 'from' }],
       ownerUuid: 'owner-1',
       accessLevel: 'OWNER',
+      categories: [],
       properties: {
         shellies: { uuid: 'atom-1' },
         nuclearies: { title: 'Alpha', description: 'First', content: 'Active', operation: '', constants: {} },
@@ -17,6 +18,7 @@ function mockGraphQL(page: import('@playwright/test').Page) {
       bonds: [],
       ownerUuid: 'owner-1',
       accessLevel: 'OWNER',
+      categories: [],
       properties: {
         shellies: { uuid: 'atom-2' },
         nuclearies: { title: 'Beta', description: 'Second', content: 'Pending', operation: '', constants: {} },
@@ -157,7 +159,8 @@ test.describe('Graph workspace', () => {
     const detailPanel = page.getByRole('complementary', { name: /atom details/i })
     await expect(detailPanel).toBeVisible()
     await expect(detailPanel.getByLabel(/title/i)).toHaveValue('Alpha')
-    await expect(detailPanel.getByLabel(/labels.*comma/i)).toHaveValue('Project')
+    // No labels field in the Details tab anymore — Classify owns labels (ADR-260063).
+    await expect(detailPanel.getByLabel(/labels/i)).toHaveCount(0)
     await expect(detailPanel.getByLabel(/description/i)).toHaveValue('First')
   })
 
@@ -184,7 +187,6 @@ test.describe('Graph workspace', () => {
     await page.getByText('Beta', { exact: true }).click()
     const detailPanel = page.getByRole('complementary', { name: /atom details/i })
     await expect(detailPanel.getByLabel(/title/i)).toHaveValue('Beta')
-    await expect(detailPanel.getByLabel(/labels.*comma/i)).toHaveValue('Task')
   })
 
   test('edits atom properties via detail panel save', async ({ page }) => {
@@ -333,6 +335,7 @@ test.describe('Graph workspace', () => {
                   bonds: [],
                   ownerUuid: 'owner-1',
                   accessLevel: 'OWNER',
+                  categories: [],
                   properties: {
                     shellies: { uuid: 'atom-1' },
                     nuclearies: { title: 'Alpha', description: '', content: '', operation: '', constants: {} },

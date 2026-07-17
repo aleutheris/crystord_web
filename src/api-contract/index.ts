@@ -63,10 +63,23 @@ export {
 export type {
   Atom,
   AtomBond,
+  AtomCategoryAssignment,
   AtomNuclearies,
   EffectiveAccessLevel,
   RetrieveResponse,
   ListLabelsResponse,
 } from './graph-queries'
+export {
+  RETRIEVE_CATEGORY_DIMENSIONS_QUERY,
+  RETRIEVE_CATEGORY_VALUES_QUERY,
+} from './category-operations'
+export type {
+  CategoryDimension,
+  CategoryValue,
+  CategoryDimensionSelector,
+  CategoryValueSelector,
+  RetrieveCategoryDimensionsResponse,
+  RetrieveCategoryValuesResponse,
+} from './category-operations'
 export { atomPermissions } from './access-control'
 export type { AtomPermissions } from './access-control'

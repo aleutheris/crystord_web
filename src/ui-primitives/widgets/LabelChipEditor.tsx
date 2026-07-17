@@ -16,6 +16,7 @@ export function LabelChipEditor({
   placeholder = 'Add label…',
   ariaLabel = 'Labels',
   classNames,
+  chipStyle,
 }: LabelChipEditorProps) {
   const [draft, setDraft] = useState('')
 
@@ -28,7 +29,7 @@ export function LabelChipEditor({
   return (
     <div role="group" aria-label={ariaLabel} className={classNames?.root}>
       {labels.map((label) => (
-        <span key={label} className={classNames?.chip}>
+        <span key={label} className={classNames?.chip} style={chipStyle?.(label)}>
           {label}
           <button
             type="button"

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { FormEvent } from 'react'
 import type { Atom } from '../../api-contract/graph-queries'
 import { atomPermissions } from '../../api-contract/access-control'
+import { LabelChipEditor } from '../../ui-primitives'
 import { C_BORDER, C_CARD_BG, C_ERROR, C_TEXT_MUTED } from '../../styles/tokens'
 
 interface DetailPanelProps {
@@ -18,7 +19,9 @@ export function DetailPanel({ atom, isCreationMode, onCreate, onUpdate, onDelete
   const [title, setTitle] = useState(atom?.properties.nuclearies.title ?? '')
   const [description, setDescription] = useState(atom?.properties.nuclearies.description ?? '')
   const [content, setContent] = useState(atom?.properties.nuclearies.content ?? '')
-  const [labels, setLabels] = useState(atom?.labels.join(', ') ?? '')
+  // Creation-mode only: `change` requires labels at creation, so creation keeps a chip editor.
+  // Edit-mode label editing moved to the Classify inspector tab (ADR-260063 / EPIC-260067).
+  const [labels, setLabels] = useState<string[]>([])
   const [saving, setSaving] = useState(false)
 
   // Read-side affordance gating (BI-260061 / REQ-FR-260069). Creation is always editable (you own the
@@ -33,13 +36,12 @@ export function DetailPanel({ atom, isCreationMode, onCreate, onUpdate, onDelete
     if (!canEdit) return
     setSaving(true)
     try {
-      const parsedLabels = labels.split(',').map((l) => l.trim()).filter(Boolean)
       if (isCreationMode && onCreate) {
-        await onCreate(title, parsedLabels, description, content)
+        await onCreate(title, labels, description, content)
       } else if (atom && onUpdate) {
+        // Labels are untouched here (the spread keeps `atom.labels`) — Classify owns them.
         const updated: Atom = {
           ...atom,
-          labels: parsedLabels,
           properties: {
             ...atom.properties,
             nuclearies: { ...atom.properties.nuclearies, title, description, content },
@@ -87,10 +89,16 @@ export function DetailPanel({ atom, isCreationMode, onCreate, onUpdate, onDelete
           <label htmlFor="detail-title" style={{ fontSize: '0.8rem', fontWeight: 600 }}>Title</label>
           <input id="detail-title" value={title} onChange={(e) => setTitle(e.target.value)} required readOnly={readOnly} style={{ width: '100%', padding: '0.4rem', boxSizing: 'border-box' }} />
         </div>
-        <div>
-          <label htmlFor="detail-labels" style={{ fontSize: '0.8rem', fontWeight: 600 }}>Labels (comma-separated)</label>
-          <input id="detail-labels" value={labels} onChange={(e) => setLabels(e.target.value)} readOnly={readOnly} style={{ width: '100%', padding: '0.4rem', boxSizing: 'border-box' }} />
-        </div>
+        {isCreationMode && (
+          <div>
+            <span style={{ fontSize: '0.8rem', fontWeight: 600, display: 'block' }}>Labels</span>
+            <LabelChipEditor
+              labels={labels}
+              onAdd={(label) => setLabels((prev) => [...prev, label])}
+              onRemove={(label) => setLabels((prev) => prev.filter((l) => l !== label))}
+            />
+          </div>
+        )}
         <div>
           <label htmlFor="detail-description" style={{ fontSize: '0.8rem', fontWeight: 600 }}>Description</label>
           <textarea id="detail-description" value={description} onChange={(e) => setDescription(e.target.value)} rows={3} readOnly={readOnly} style={{ width: '100%', padding: '0.4rem', boxSizing: 'border-box', resize: 'vertical' }} />

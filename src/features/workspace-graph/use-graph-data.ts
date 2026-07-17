@@ -114,6 +114,11 @@ export function useGraphData(): GraphData {
           selector: { uuid },
           inputs: [{
             labels: atom.labels,
+            // AtomInput.categories has replace-all semantics (schema 9.2.0 / ADR-260063): when
+            // present (including []) it REPLACES every assignment; omitted leaves them unchanged.
+            // So the field is sent only when the atom carries categories — an atom from an older
+            // mock/response without them must not wipe the server-side assignments.
+            ...(atom.categories ? { categories: atom.categories.map((c) => ({ valueKey: c.valueKey })) } : {}),
             bonds: stripSystemBonds(atom.bonds).map((b) => ({ uuid: b.uuid, name: b.name, direction: b.direction })),
             properties: { nuclearies: toNucleariesInput(atom.properties.nuclearies) },
           }],

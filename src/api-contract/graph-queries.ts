@@ -12,6 +12,10 @@ export const RETRIEVE_QUERY = gql`
       labels
       ownerUuid
       accessLevel
+      categories {
+        dimensionKey
+        valueKey
+      }
       bonds {
         uuid
         name
@@ -86,6 +90,12 @@ export interface AtomNuclearies {
  */
 export type EffectiveAccessLevel = 'OWNER' | 'EDITOR' | 'VIEWER'
 
+/** One category assignment on an atom (schema 9.2.0 `AtomOutput.categories`). */
+export interface AtomCategoryAssignment {
+  dimensionKey: string
+  valueKey: string
+}
+
 export interface Atom {
   labels: string[]
   bonds: AtomBond[]
@@ -100,6 +110,12 @@ export interface Atom {
    */
   ownerUuid?: string | null
   accessLevel?: EffectiveAccessLevel | null
+  /**
+   * Category assignments (schema 9.2.0). Modelled optional so existing mocks/older responses
+   * without them stay valid (the established pattern, see ownerUuid above); `updateAtom` sends
+   * `categories` only when present — AtomInput replace-all semantics (ADR-260063).
+   */
+  categories?: AtomCategoryAssignment[]
 }
 
 export interface RetrieveResponse {

@@ -6,6 +6,7 @@ const BASE_ATOMS = [
     bonds: [],
     ownerUuid: 'owner-1',
     accessLevel: 'OWNER',
+    categories: [],
     properties: {
       shellies: { uuid: 'atom-1' },
       nuclearies: { title: 'Alpha', description: 'First', content: 'Active', operation: '', constants: {} },
@@ -16,6 +17,7 @@ const BASE_ATOMS = [
     bonds: [],
     ownerUuid: 'owner-1',
     accessLevel: 'OWNER',
+    categories: [],
     properties: {
       shellies: { uuid: 'atom-2' },
       nuclearies: { title: 'Beta', description: 'Second', content: 'Pending', operation: '', constants: {} },
@@ -28,6 +30,7 @@ const NEW_ATOM = {
   bonds: [],
   ownerUuid: 'owner-1',
   accessLevel: 'OWNER',
+  categories: [],
   properties: {
     shellies: { uuid: 'new-uuid' },
     nuclearies: { title: 'Gamma', description: 'New atom', content: '', operation: '', constants: {} },
@@ -152,7 +155,9 @@ test.describe('Explicit atom creation', () => {
 
     const panel = page.getByRole('complementary', { name: /create atom/i })
     await expect(panel.getByLabel(/title/i)).toHaveValue('')
-    await expect(panel.getByLabel(/labels.*comma/i)).toHaveValue('')
+    // Labels use the shared chip editor (ADR-260063): empty input, no chips yet.
+    await expect(panel.getByLabel('Add label')).toHaveValue('')
+    await expect(panel.getByRole('button', { name: /^remove /i })).toHaveCount(0)
     await expect(panel.getByLabel(/description/i)).toHaveValue('')
     await expect(panel.getByLabel(/content/i)).toHaveValue('')
   })
@@ -189,7 +194,8 @@ test.describe('Explicit atom creation', () => {
 
     const panel = page.getByRole('complementary', { name: /create atom/i })
     await panel.getByLabel(/title/i).fill('Gamma')
-    await panel.getByLabel(/labels.*comma/i).fill('Project')
+    await panel.getByLabel('Add label').fill('Project')
+    await panel.getByLabel('Add label').press('Enter')
     await panel.getByLabel(/description/i).fill('New atom')
 
     const createResponse = page.waitForResponse(
@@ -230,7 +236,8 @@ test.describe('Explicit atom creation', () => {
     await page.getByRole('button', { name: /create atom/i }).click()
     const panel = page.getByRole('complementary', { name: /create atom/i })
     await panel.getByLabel(/title/i).fill('Gamma')
-    await panel.getByLabel(/labels.*comma/i).fill('Project')
+    await panel.getByLabel('Add label').fill('Project')
+    await panel.getByLabel('Add label').press('Enter')
 
     const retrieveResponse = page.waitForResponse(
       (r) => /\/(api|graphql)\b/.test(r.url()) && r.request().postData()?.includes('retrieve') === true,
@@ -250,7 +257,8 @@ test.describe('Explicit atom creation', () => {
     await page.getByRole('button', { name: /create atom/i }).click()
     const panel = page.getByRole('complementary', { name: /create atom/i })
     await panel.getByLabel(/title/i).fill('Gamma')
-    await panel.getByLabel(/labels.*comma/i).fill('Other')
+    await panel.getByLabel('Add label').fill('Other')
+    await panel.getByLabel('Add label').press('Enter')
 
     const retrieveResponse = page.waitForResponse(
       (r) => /\/(api|graphql)\b/.test(r.url()) && r.request().postData()?.includes('retrieve') === true,

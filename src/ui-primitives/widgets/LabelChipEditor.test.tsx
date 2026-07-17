@@ -40,6 +40,18 @@ describe('LabelChipEditor', () => {
     expect(onAdd).not.toHaveBeenCalled()
   })
 
+  it('applies the per-chip style seam to each chip (ADR-260063)', () => {
+    render(
+      <LabelChipEditor
+        labels={['Project']}
+        onAdd={vi.fn()}
+        onRemove={vi.fn()}
+        chipStyle={(label) => (label === 'Project' ? { background: 'var(--label-chip-1)' } : undefined)}
+      />,
+    )
+    expect(screen.getByText('Project')).toHaveStyle({ background: 'var(--label-chip-1)' })
+  })
+
   it('renders autocomplete suggestions as datalist options', () => {
     const { container } = render(<LabelChipEditor labels={[]} suggestions={['Alpha', 'Beta']} onAdd={vi.fn()} onRemove={vi.fn()} />)
     expect(container.querySelectorAll('datalist option')).toHaveLength(2)

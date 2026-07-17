@@ -57,6 +57,17 @@
   --color-chip-inactive-bg: #F3F6F8;
   --color-chip-inactive-border: #D6DEE5;
   --color-chip-inactive-text: #5B6B7A;
+
+  /* Deterministic label-chip palette — 8 desaturated, brand-adjacent hues (ADR-260063).
+     Indexed by the char-code hash in src/styles/label-colors.ts; never the sole signal. */
+  --label-chip-1: #DAE6F2;
+  --label-chip-2: #D6EDE4;
+  --label-chip-3: #F2E8D0;
+  --label-chip-4: #F0DFDA;
+  --label-chip-5: #E4DFF0;
+  --label-chip-6: #D7ECF0;
+  --label-chip-7: #E5EBD5;
+  --label-chip-8: #F0DDEA;
 }
 
 /* Force light theme regardless of data-theme or prefers-color-scheme (ADR-260053) */
@@ -91,6 +102,14 @@
   --color-chip-inactive-bg: #F3F6F8;
   --color-chip-inactive-border: #D6DEE5;
   --color-chip-inactive-text: #5B6B7A;
+  --label-chip-1: #DAE6F2;
+  --label-chip-2: #D6EDE4;
+  --label-chip-3: #F2E8D0;
+  --label-chip-4: #F0DFDA;
+  --label-chip-5: #E4DFF0;
+  --label-chip-6: #D7ECF0;
+  --label-chip-7: #E5EBD5;
+  --label-chip-8: #F0DDEA;
 }
 
 /* Explicit dark theme */
@@ -125,6 +144,14 @@
   --color-chip-inactive-bg: #2A3346;
   --color-chip-inactive-border: #3A4455;
   --color-chip-inactive-text: #9AABB6;
+  --label-chip-1: #2A4059;
+  --label-chip-2: #24473C;
+  --label-chip-3: #4C4026;
+  --label-chip-4: #4C332C;
+  --label-chip-5: #3C3354;
+  --label-chip-6: #204650;
+  --label-chip-7: #3C4429;
+  --label-chip-8: #482F3F;
 }
 
 /* System-preference dark when no explicit data-theme is set */
@@ -160,6 +187,14 @@
     --color-chip-inactive-bg: #2A3346;
     --color-chip-inactive-border: #3A4455;
     --color-chip-inactive-text: #9AABB6;
+    --label-chip-1: #2A4059;
+    --label-chip-2: #24473C;
+    --label-chip-3: #4C4026;
+    --label-chip-4: #4C332C;
+    --label-chip-5: #3C3354;
+    --label-chip-6: #204650;
+    --label-chip-7: #3C4429;
+    --label-chip-8: #482F3F;
   }
 }
 
