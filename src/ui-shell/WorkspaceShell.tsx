@@ -99,7 +99,9 @@ export function WorkspaceShell({ googleClientId }: { googleClientId?: string }) 
               aria-labelledby={`tab-${activeView}`}
               style={{ flex: 1, position: 'relative' }}
             >
-              <GraphLegend view={activeView} />
+              {/* Canvas chrome only — the legend describes nodes/edges, which non-graph
+                  views (Table, Board) don't have. */}
+              {(activeView === 'flow' || activeView === 'network') && <GraphLegend view={activeView} />}
               <GraphRenderGate
                 atomCount={graphData.atoms.length}
                 mode={renderMode}

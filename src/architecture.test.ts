@@ -29,7 +29,7 @@ function extractImports(filePath: string): string[] {
   return matches.map(m => m[1]!)
 }
 
-const FEATURE_MODULES = ['auth-entry', 'workspace-graph', 'workspace-search', 'workspace-details', 'account-settings']
+const FEATURE_MODULES = ['auth-entry', 'workspace-graph', 'workspace-search', 'workspace-details', 'workspace-table', 'account-settings']
 
 describe('Architecture boundary checks', () => {
   describe('dependency direction — no cross-feature imports', () => {
@@ -210,6 +210,7 @@ describe('Contract stability — barrel export checks (G5)', () => {
     'workspace-graph': ['GraphCanvas', 'useGraphData', 'GraphData'],
     'workspace-search': ['SearchBar', 'QuerySummary', 'SearchResultPanel', 'useSearch', 'SearchState', 'SearchFilters'],
     'workspace-details': ['DetailPanel'],
+    'workspace-table': ['TableView'],
     'account-settings': ['AccountSettingsPanel'],
   }
 
@@ -2766,5 +2767,42 @@ describe('No gated read is issued before authentication (BI-260054 / REQ-FR-2600
         `${path.relative(SRC, file)} pulls a gated read into the pre-auth auth-entry surface`,
       ).toBe(false)
     }
+  })
+})
+
+// --- EPIC-260071: Table view — tri-view registration + inline edit (ADR-260062 / REQ-FR-260070) ---
+
+describe('Table view registration — tri-view center host (ADR-260062 / EPIC-260071 T2)', () => {
+  it('view registry registers the Table view from the workspace-table barrel, after the graph views', () => {
+    const viewReg = fs.readFileSync(path.join(SRC, 'ui-shell', 'slots', 'view-registry.ts'), 'utf-8')
+    expect(viewReg).toContain('TableView')
+    expect(viewReg).toMatch(/id:\s*'table'/)
+    expect(viewReg).toMatch(/from '\.\.\/\.\.\/features\/workspace-table'/)
+    // Not "home": Table registers after Network/Flow in display order (ADR-260062 D6 / Q1).
+    expect(viewReg.indexOf("id: 'table'")).toBeGreaterThan(viewReg.indexOf("id: 'flow'"))
+  })
+
+  it('TableView is a DOM table, not a canvas — no @xyflow/react and no workspace-graph import', () => {
+    const view = fs.readFileSync(path.join(FEATURES, 'workspace-table', 'TableView.tsx'), 'utf-8')
+    expect(view).toContain('<table')
+    expect(view).not.toContain('@xyflow/react')
+    expect(view).not.toContain('features/workspace-graph')
+  })
+
+  it('TableView reflects shared selection and edits through the single mutation source', () => {
+    const view = fs.readFileSync(path.join(FEATURES, 'workspace-table', 'TableView.tsx'), 'utf-8')
+    // Shared selection parity (ADR-260062 D2): selectedAtomId marks the row via aria-current
+    // (valid on a static-table row, unlike aria-selected which needs a grid/tab composite),
+    // and edits go through the single updateAtom mutation source (D3).
+    expect(view).toContain('selectedAtomId')
+    expect(view).toContain('aria-current')
+    expect(view).toContain('updateAtom')
+  })
+
+  it('the graph legend is canvas chrome — not rendered over non-graph views', () => {
+    const shell = fs.readFileSync(path.join(SRC, 'ui-shell', 'WorkspaceShell.tsx'), 'utf-8')
+    // The legend describes nodes/edges; it must be gated to the canvas views, not the tabpanel.
+    expect(shell).toMatch(/'flow'[\s\S]{0,60}<GraphLegend|<GraphLegend[\s\S]{0,60}'flow'/)
+    expect(shell).toMatch(/activeView === 'flow' \|\| activeView === 'network'/)
   })
 })
