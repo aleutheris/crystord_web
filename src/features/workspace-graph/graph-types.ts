@@ -19,6 +19,10 @@ export function atomsToNodes(atoms: Atom[]): Node[] {
     data: {
       title: atom.properties.nuclearies.title,
       labels: atom.labels,
+      // Feed the LOD block state (ADR-260067): meta-row value, "ƒ" computed marker, dimension dots.
+      content: atom.properties.nuclearies.content,
+      operation: atom.properties.nuclearies.operation,
+      categories: atom.categories ?? [],
       // Drives whether the node exposes a bond-create (source) handle — read-side gating (BI-260061).
       canBond: atomPermissions(atom.accessLevel).canBond,
     },

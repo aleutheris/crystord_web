@@ -173,6 +173,11 @@ test.describe('Compute tab', () => {
     await expect(page.getByRole('img', { name: 'Division by zero' })).toBeVisible()
     await expect(page.getByRole('img', { name: 'Up to date' })).toBeVisible()
 
+    // LOD block at the default fit zoom (ADR-260067 / EPIC-260072): both computed atoms show
+    // the ƒ marker, composing with the badges above; label dots carry the label as text.
+    await expect(page.getByRole('img', { name: 'Computed atom' })).toHaveCount(2)
+    await expect(page.getByRole('group', { name: 'Classification' }).first()).toBeVisible()
+
     await openComputeTab(page, 'Ratio')
     await expect(page.getByText('This value could not be computed: a division by zero occurred.')).toBeVisible()
   })

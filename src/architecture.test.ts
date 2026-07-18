@@ -3046,3 +3046,32 @@ describe('Account menu consolidation (ADR-260066 / EPIC-260070)', () => {
     }
   })
 })
+
+// --- EPIC-260072: Node visual design — LOD & Blender-style blocks (ADR-260067 / REQ-FR-260075) ---
+
+describe('Node level-of-detail (ADR-260067 / EPIC-260072)', () => {
+  it('node-lod pins the LOD threshold literal', () => {
+    const lod = fs.readFileSync(path.join(FEATURES, 'workspace-graph', 'node-lod.ts'), 'utf-8')
+    expect(lod).toMatch(/LOD_THRESHOLD\s*=\s*0\.75/)
+  })
+
+  it('AtomNode forks the body on the zoom signal and keeps both region markers', () => {
+    const node = fs.readFileSync(path.join(FEATURES, 'workspace-graph', 'AtomNode.tsx'), 'utf-8')
+    expect(node).toContain('lodStateForZoom')
+    expect(node).toContain('useStore')
+    expect(node).toMatch(/data-node-region="body"/)
+    // Seam discipline (ADR-260067): the badges region markup composes unchanged over both states.
+    expect(node).toMatch(/data-node-region="badges"/)
+  })
+
+  it('CircleAtomNode carries no LOD wiring (Flow-only scope)', () => {
+    const circle = fs.readFileSync(path.join(FEATURES, 'workspace-graph', 'CircleAtomNode.tsx'), 'utf-8')
+    expect(circle).not.toContain('lodStateForZoom')
+    expect(circle).not.toContain('LOD_THRESHOLD')
+  })
+
+  it('classification dots row carries its meaning as text — never color alone', () => {
+    const node = fs.readFileSync(path.join(FEATURES, 'workspace-graph', 'AtomNode.tsx'), 'utf-8')
+    expect(node).toContain('aria-label="Classification"')
+  })
+})

@@ -34,6 +34,24 @@ describe('atomsToNodes', () => {
     expect(atomsToNodes([])).toEqual([])
   })
 
+  it('stamps the LOD block data — content, operation, categories (ADR-260067 / EPIC-260072)', () => {
+    const computed: Atom = {
+      ...makeAtom('a1', 'Total', ['Num']),
+      categories: [{ dimensionKey: 'region', valueKey: 'europe' }],
+    }
+    computed.properties.nuclearies.content = '12'
+    computed.properties.nuclearies.operation = '{"name":"SUM","args":[]}'
+    const [n1, n2] = atomsToNodes([computed, makeAtom('a2', 'Beta')])
+
+    expect(n1!.data).toMatchObject({
+      content: '12',
+      operation: '{"name":"SUM","args":[]}',
+      categories: [{ dimensionKey: 'region', valueKey: 'europe' }],
+    })
+    // Manual atom without categories: operation stays null, categories normalize to [].
+    expect(n2!.data).toMatchObject({ content: '', operation: null, categories: [] })
+  })
+
   it('threads canBond from the atom access level (read-side gating, BI-260061)', () => {
     const owner: Atom = { ...makeAtom('a1', 'Owned'), accessLevel: 'OWNER' }
     const editor: Atom = { ...makeAtom('a2', 'Editable'), accessLevel: 'EDITOR' }
