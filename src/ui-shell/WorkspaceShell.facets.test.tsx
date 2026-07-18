@@ -17,6 +17,11 @@ vi.mock('../features/auth-entry', () => ({
 
 vi.mock('../features/account-settings', () => ({
   AccountSettingsPanel: () => null,
+  useAccountInfo: () => ({ account: null, loading: true, error: null, refetch: vi.fn() }),
+}))
+
+vi.mock('../features/workspace-admin', () => ({
+  WorkspacePanel: () => null,
 }))
 
 vi.mock('../features/workspace-graph', () => ({

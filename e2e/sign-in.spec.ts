@@ -75,7 +75,8 @@ test.describe('Sign-in flow', () => {
     await page.getByRole('button', { name: /try a demo/i }).click()
     await responsePromise
 
-    await expect(page.getByRole('button', { name: /sign out/i })).toBeVisible()
+    // The authenticated sentinel is the account-menu trigger (ADR-260066).
+    await expect(page.getByRole('button', { name: 'Account menu' })).toBeVisible()
   })
 
   test('sign out returns to sign-in page', async ({ page }) => {
@@ -89,8 +90,10 @@ test.describe('Sign-in flow', () => {
     await page.getByRole('button', { name: /try a demo/i }).click()
     await responsePromise
 
-    await expect(page.getByRole('button', { name: /sign out/i })).toBeVisible()
-    await page.getByRole('button', { name: /sign out/i }).click()
+    // Sign Out lives inside the account menu, pinned last (ADR-260066).
+    await expect(page.getByRole('button', { name: 'Account menu' })).toBeVisible()
+    await page.getByRole('button', { name: 'Account menu' }).click()
+    await page.getByRole('menuitem', { name: /sign out/i }).click()
     await expect(page.getByRole('heading', { name: /sign in/i })).toBeVisible()
   })
 })

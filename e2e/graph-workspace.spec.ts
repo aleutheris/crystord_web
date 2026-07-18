@@ -140,7 +140,8 @@ test.describe('Graph workspace', () => {
     await mockGraphQL(page)
     await signIn(page)
 
-    await expect(page.getByRole('button', { name: /sign out/i })).toBeVisible()
+    // The authenticated sentinel is the account-menu trigger (ADR-260066).
+    await expect(page.getByRole('button', { name: 'Account menu' })).toBeVisible()
     await expect(page.getByLabel(/search labels/i)).toBeVisible()
     // Graph is blank — no atom nodes
     await expect(page.getByText('Alpha')).not.toBeVisible()
@@ -237,7 +238,7 @@ test.describe('Graph workspace', () => {
     await saveResponse
 
     // Workspace remains functional after save
-    await expect(page.getByRole('button', { name: /sign out/i })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Account menu' })).toBeVisible()
   })
 
   test('shows delete confirmation dialog and cancellation preserves atom', async ({ page }) => {
@@ -285,7 +286,7 @@ test.describe('Graph workspace', () => {
     await destroyResponse
 
     // Workspace remains functional after deletion
-    await expect(page.getByRole('button', { name: /sign out/i })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Account menu' })).toBeVisible()
   })
 
   test('shows Flow view as default after sign-in under compute emphasis', async ({ page }) => {
@@ -414,6 +415,16 @@ test.describe('Graph workspace', () => {
     await detailPanel.getByRole('button', { name: /save/i }).click()
 
     // Workspace still shows existing data and navigation
-    await expect(page.getByRole('button', { name: /sign out/i })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Account menu' })).toBeVisible()
+  })
+
+  test('sign out via the account menu returns to the sign-in page', async ({ page }) => {
+    await mockGraphQL(page)
+    await signIn(page)
+
+    // Sign Out is consolidated into the account menu, pinned last (ADR-260066).
+    await page.getByRole('button', { name: 'Account menu' }).click()
+    await page.getByRole('menuitem', { name: /sign out/i }).click()
+    await expect(page.getByRole('heading', { name: /sign in/i })).toBeVisible()
   })
 })

@@ -29,7 +29,7 @@ function extractImports(filePath: string): string[] {
   return matches.map(m => m[1]!)
 }
 
-const FEATURE_MODULES = ['auth-entry', 'workspace-graph', 'workspace-search', 'workspace-details', 'workspace-table', 'workspace-classify', 'workspace-categories', 'workspace-compute', 'account-settings']
+const FEATURE_MODULES = ['auth-entry', 'workspace-graph', 'workspace-search', 'workspace-details', 'workspace-table', 'workspace-classify', 'workspace-categories', 'workspace-compute', 'account-settings', 'workspace-admin']
 
 describe('Architecture boundary checks', () => {
   describe('dependency direction — no cross-feature imports', () => {
@@ -215,6 +215,7 @@ describe('Contract stability — barrel export checks (G5)', () => {
     'workspace-categories': ['CategoriesNavigator'],
     'workspace-compute': ['ComputeTab'],
     'account-settings': ['AccountSettingsPanel'],
+    'workspace-admin': ['WorkspacePanel'],
   }
 
   for (const [mod, expectedExports] of Object.entries(EXPECTED_BARRELS)) {
@@ -2392,9 +2393,13 @@ describe('Token system integration wiring (BI-260047)', () => {
     expect(app).toContain('ThemeProvider')
   })
 
-  it('WorkspaceShell renders ThemeToggle in header', () => {
+  it('WorkspaceShell exposes the theme control via the AccountMenu (ADR-260066 rewrote the BI-260047 pin)', () => {
+    // The standalone header ThemeToggle was consolidated into the account menu's Theme item
+    // (ADR-260066); ThemeToggle.tsx itself is kept and pinned above.
     const shell = fs.readFileSync(path.join(SRC, 'ui-shell', 'WorkspaceShell.tsx'), 'utf-8')
-    expect(shell).toContain('ThemeToggle')
+    expect(shell).toContain('AccountMenu')
+    const menu = fs.readFileSync(path.join(SRC, 'ui-shell', 'AccountMenu.tsx'), 'utf-8')
+    expect(menu).toContain('useTheme')
   })
 })
 
@@ -2995,5 +3000,49 @@ describe('Compute authoring and transparency (ADR-260065 / EPIC-260069)', () => 
     const spec = fs.readFileSync(path.join(ROOT, 'e2e', 'compute.spec.ts'), 'utf-8')
     expect(spec).toContain('discoverOperations')
     expect(spec).toMatch(/"name":"SUM"|\\"name\\":\\"SUM\\"/)
+  })
+})
+
+// --- EPIC-260070: Account & Settings — avatar menu and settings surfaces (ADR-260066 / REQ-FR-260074) ---
+
+describe('Account menu consolidation (ADR-260066 / EPIC-260070)', () => {
+  it('WorkspaceShell renders the AccountMenu and no longer the three loose header controls', () => {
+    const shell = fs.readFileSync(path.join(SRC, 'ui-shell', 'WorkspaceShell.tsx'), 'utf-8')
+    expect(shell).toMatch(/<AccountMenu/)
+    expect(shell).not.toMatch(/<ThemeToggle/)
+  })
+
+  it('AccountMenu is a WAI-ARIA menu with Sign Out pinned last, after Preferences and a separator', () => {
+    const menu = fs.readFileSync(path.join(SRC, 'ui-shell', 'AccountMenu.tsx'), 'utf-8')
+    expect(menu).toContain('role="menu"')
+    expect(menu).toContain('role="menuitem"')
+    expect(menu).toContain('role="separator"')
+    // Keyboard pattern: roving arrows + Escape-to-trigger.
+    expect(menu).toContain('ArrowDown')
+    expect(menu).toContain('ArrowUp')
+    expect(menu).toContain('Escape')
+    expect(menu.indexOf("'Sign Out'")).toBeGreaterThan(menu.indexOf("'Preferences…'"))
+  })
+
+  it('PreferencesPanel is a shell-owned modal writing the EPIC-260066 preferences contract', () => {
+    const panel = fs.readFileSync(path.join(SRC, 'ui-shell', 'PreferencesPanel.tsx'), 'utf-8')
+    expect(panel).toContain('role="dialog"')
+    expect(panel).toContain('homeEmphasis')
+    expect(panel).toContain('computeBadges')
+  })
+
+  it('api-contract barrel exposes the workspace-operations documents', () => {
+    const barrel = fs.readFileSync(path.join(SRC, 'api-contract', 'index.ts'), 'utf-8')
+    expect(barrel).toContain('LIST_MY_WORKSPACES_QUERY')
+  })
+
+  it('workspace-admin imports no other feature module', () => {
+    const dir = path.join(FEATURES, 'workspace-admin')
+    for (const file of collectTsFiles(dir)) {
+      for (const imp of extractImports(file)) {
+        expect(imp).not.toMatch(/features\/(?!workspace-admin)/)
+        expect(imp).not.toContain('ui-shell')
+      }
+    }
   })
 })

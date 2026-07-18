@@ -100,6 +100,37 @@ export type {
   DeleteCategoryDimensionResponse,
   DeleteCategoryValueResponse,
 } from './category-operations'
+export {
+  LIST_MY_WORKSPACES_QUERY,
+  LIST_WORKSPACE_MEMBERS_QUERY,
+  CREATE_WORKSPACE_MUTATION,
+  UPDATE_WORKSPACE_MUTATION,
+  DISSOLVE_WORKSPACE_MUTATION,
+  ADD_WORKSPACE_MEMBER_MUTATION,
+  REMOVE_WORKSPACE_MEMBER_MUTATION,
+  UPDATE_WORKSPACE_MEMBER_ROLE_MUTATION,
+} from './workspace-operations'
+export type {
+  Workspace,
+  WorkspaceMember,
+  WorkspaceRole,
+  WorkspaceMutationResult,
+  ListMyWorkspacesResponse,
+  ListWorkspaceMembersVariables,
+  ListWorkspaceMembersResponse,
+  CreateWorkspaceVariables,
+  CreateWorkspaceResponse,
+  UpdateWorkspaceVariables,
+  UpdateWorkspaceResponse,
+  DissolveWorkspaceVariables,
+  DissolveWorkspaceResponse,
+  AddWorkspaceMemberVariables,
+  AddWorkspaceMemberResponse,
+  RemoveWorkspaceMemberVariables,
+  RemoveWorkspaceMemberResponse,
+  UpdateWorkspaceMemberRoleVariables,
+  UpdateWorkspaceMemberRoleResponse,
+} from './workspace-operations'
 export { atomPermissions } from './access-control'
 export type { AtomPermissions } from './access-control'
 export { DISCOVER_OPERATIONS_QUERY } from './compute-operations'

@@ -2,7 +2,8 @@ import { useState, useMemo, useCallback } from 'react'
 import { ReactFlowProvider } from '@xyflow/react'
 import type { CategoryFacetFilter, WorkspaceFilter } from '../ui-primitives'
 import { useLogout, useAuth } from '../features/auth-entry'
-import { AccountSettingsPanel } from '../features/account-settings'
+import { AccountSettingsPanel, useAccountInfo } from '../features/account-settings'
+import { WorkspacePanel } from '../features/workspace-admin'
 import { useGraphData, DeleteConfirmDialog, useGraphDegrade } from '../features/workspace-graph'
 import { CreationNotification } from '../features/workspace-details'
 import { SearchBar, QuerySummary, useSearch, useRecommendedLabels } from '../features/workspace-search'
@@ -17,7 +18,8 @@ import { enabledViews, initialActiveView } from './slots'
 import { WorkspaceProvider, type WorkspaceContextValue } from './workspace-context'
 import { usePreferences } from './use-preferences'
 import { Inspector } from './Inspector'
-import { ThemeToggle } from '../styles/ThemeToggle'
+import { AccountMenu } from './AccountMenu'
+import { PreferencesPanel } from './PreferencesPanel'
 import { C_BORDER } from '../styles/tokens'
 
 export function WorkspaceShell({ googleClientId }: { googleClientId?: string }) {
@@ -35,6 +37,11 @@ export function WorkspaceShell({ googleClientId }: { googleClientId?: string }) 
   const [isCreatingAtom, setIsCreatingAtom] = useState(false)
   const [creationSuccessMsg, setCreationSuccessMsg] = useState<string | null>(null)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
+  const [isWorkspacesOpen, setIsWorkspacesOpen] = useState(false)
+  const [isPreferencesOpen, setIsPreferencesOpen] = useState(false)
+  // One `me` fetch for the whole shell: the menu shows the identity, the workspace panel
+  // derives the caller's role from it (ADR-260066).
+  const { account } = useAccountInfo()
   const [categoryFacets, setCategoryFacets] = useState<CategoryFacetFilter[]>([])
   const canvasMode = renderMode === 'full' ? 'full' : 'reduced'
 
@@ -106,15 +113,14 @@ export function WorkspaceShell({ googleClientId }: { googleClientId?: string }) 
         <h1 style={{ margin: 0, fontSize: '1.25rem', flexShrink: 0 }}>Crystord</h1>
         <SearchBar search={search} recommendedLabels={recommendedLabels} />
         <FacetChips facets={categoryFacets} onChange={handleFacetsChange} />
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexShrink: 0 }}>
-          <ThemeToggle />
-          <button type="button" onClick={() => setIsSettingsOpen(true)} style={{ padding: '0.25rem 0.75rem' }}>
-            Account
-          </button>
-          <button type="button" onClick={logout} style={{ padding: '0.25rem 0.75rem' }}>
-            Sign Out
-          </button>
-        </div>
+        {/* One avatar menu consolidates the former ThemeToggle/Account/Sign-Out controls (ADR-260066). */}
+        <AccountMenu
+          account={account}
+          onOpenAccountSettings={() => setIsSettingsOpen(true)}
+          onOpenWorkspaces={() => setIsWorkspacesOpen(true)}
+          onOpenPreferences={() => setIsPreferencesOpen(true)}
+          onSignOut={logout}
+        />
       </header>
       <QuerySummary summary={querySummary} resultCount={graphData.atoms.length} />
       <ReactFlowProvider>
@@ -179,6 +185,15 @@ export function WorkspaceShell({ googleClientId }: { googleClientId?: string }) 
           onSessionEnded={signOut}
           googleClientId={googleClientId}
         />
+      )}
+      {isWorkspacesOpen && (
+        <WorkspacePanel
+          onClose={() => setIsWorkspacesOpen(false)}
+          selfUsername={account?.username}
+        />
+      )}
+      {isPreferencesOpen && (
+        <PreferencesPanel onClose={() => setIsPreferencesOpen(false)} />
       )}
     </div>
     </WorkspaceProvider>

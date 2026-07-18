@@ -65,7 +65,9 @@ async function signInAndOpenSettings(page: Page) {
   )
   await page.getByRole('button', { name: /try a demo/i }).click()
   await signedIn
-  await page.getByRole('button', { name: /^account$/i }).click()
+  // The panel opens from the account menu (ADR-260066).
+  await page.getByRole('button', { name: 'Account menu' }).click()
+  await page.getByRole('menuitem', { name: /account settings/i }).click()
   await expect(page.getByRole('dialog', { name: /account settings/i })).toBeVisible()
 }
 
@@ -107,6 +109,6 @@ test.describe('Account settings — management flows', () => {
 
     await expect(page.getByRole('dialog', { name: /account settings/i }).getByRole('alert')).toHaveText(/still own atoms/i)
     // The session is intact — the user stays in the workspace rather than being routed to sign-in.
-    await expect(page.getByRole('button', { name: /^sign out$/i })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Account menu' })).toBeVisible()
   })
 })

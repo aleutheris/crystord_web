@@ -16,6 +16,20 @@ vi.mock('../features/account-settings', () => ({
       <button type="button" onClick={onClose}>close settings</button>
     </div>
   ),
+  useAccountInfo: () => ({
+    account: { username: 'demo.user', email: 'demo@crystord.test', emailVerified: true, authMethods: ['password'] },
+    loading: false,
+    error: null,
+    refetch: vi.fn(),
+  }),
+}))
+
+vi.mock('../features/workspace-admin', () => ({
+  WorkspacePanel: ({ onClose, selfUsername }: { onClose: () => void; selfUsername?: string }) => (
+    <div role="dialog" aria-label="Workspaces" data-self-username={selfUsername}>
+      <button type="button" onClick={onClose}>close workspaces</button>
+    </div>
+  ),
 }))
 
 const mockSearch = vi.fn()
@@ -162,25 +176,49 @@ describe('WorkspaceShell view switching', () => {
     expect(screen.getByRole('tab', { name: 'Flow' })).toBeInTheDocument()
   })
 
-  it('Sign Out button triggers logout (server revocation + local clear)', async () => {
+  // The header controls are consolidated into the AccountMenu dropdown (ADR-260066).
+  it('Sign Out menu item triggers logout (server revocation + local clear)', async () => {
     mockLogout.mockClear()
     render(<WorkspaceShell />)
-    await userEvent.click(screen.getByRole('button', { name: /sign out/i }))
+    await userEvent.click(screen.getByRole('button', { name: 'Account menu' }))
+    await userEvent.click(screen.getByRole('menuitem', { name: /sign out/i }))
     expect(mockLogout).toHaveBeenCalledOnce()
   })
 
-  it('opens the account settings panel from the Account button', async () => {
+  it('opens the account settings panel from the account menu', async () => {
     render(<WorkspaceShell />)
     expect(screen.queryByRole('dialog', { name: /account settings/i })).not.toBeInTheDocument()
-    await userEvent.click(screen.getByRole('button', { name: /^account$/i }))
+    await userEvent.click(screen.getByRole('button', { name: 'Account menu' }))
+    await userEvent.click(screen.getByRole('menuitem', { name: /account settings/i }))
     expect(screen.getByRole('dialog', { name: /account settings/i })).toBeInTheDocument()
   })
 
   it('closes the account settings panel via onClose', async () => {
     render(<WorkspaceShell />)
-    await userEvent.click(screen.getByRole('button', { name: /^account$/i }))
+    await userEvent.click(screen.getByRole('button', { name: 'Account menu' }))
+    await userEvent.click(screen.getByRole('menuitem', { name: /account settings/i }))
     await userEvent.click(screen.getByRole('button', { name: /close settings/i }))
     expect(screen.queryByRole('dialog', { name: /account settings/i })).not.toBeInTheDocument()
+  })
+
+  it('opens the workspace panel from the menu, threading the caller username (ADR-260066)', async () => {
+    render(<WorkspaceShell />)
+    await userEvent.click(screen.getByRole('button', { name: 'Account menu' }))
+    await userEvent.click(screen.getByRole('menuitem', { name: /workspaces/i }))
+    const panel = screen.getByRole('dialog', { name: /workspaces/i })
+    expect(panel).toHaveAttribute('data-self-username', 'demo.user')
+    await userEvent.click(screen.getByRole('button', { name: /close workspaces/i }))
+    expect(screen.queryByRole('dialog', { name: /workspaces/i })).not.toBeInTheDocument()
+  })
+
+  it('opens the preferences panel from the menu (inside the WorkspaceProvider)', async () => {
+    render(<WorkspaceShell />)
+    await userEvent.click(screen.getByRole('button', { name: 'Account menu' }))
+    await userEvent.click(screen.getByRole('menuitem', { name: /preferences/i }))
+    const dialog = screen.getByRole('dialog', { name: 'Preferences' })
+    expect(dialog).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Close preferences' }))
+    expect(screen.queryByRole('dialog', { name: 'Preferences' })).not.toBeInTheDocument()
   })
 })
 
