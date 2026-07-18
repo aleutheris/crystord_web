@@ -29,7 +29,7 @@ function extractImports(filePath: string): string[] {
   return matches.map(m => m[1]!)
 }
 
-const FEATURE_MODULES = ['auth-entry', 'workspace-graph', 'workspace-search', 'workspace-details', 'workspace-table', 'workspace-classify', 'workspace-categories', 'account-settings']
+const FEATURE_MODULES = ['auth-entry', 'workspace-graph', 'workspace-search', 'workspace-details', 'workspace-table', 'workspace-classify', 'workspace-categories', 'workspace-compute', 'account-settings']
 
 describe('Architecture boundary checks', () => {
   describe('dependency direction — no cross-feature imports', () => {
@@ -213,6 +213,7 @@ describe('Contract stability — barrel export checks (G5)', () => {
     'workspace-table': ['TableView'],
     'workspace-classify': ['ClassifyTab'],
     'workspace-categories': ['CategoriesNavigator'],
+    'workspace-compute': ['ComputeTab'],
     'account-settings': ['AccountSettingsPanel'],
   }
 
@@ -484,7 +485,7 @@ describe('Application shell slot registries (ADR-260061 / EPIC-260066 T2)', () =
 
   it('WorkspaceShell renders the active view and inspector through the registries', () => {
     const shell = fs.readFileSync(path.join(SRC, 'ui-shell', 'WorkspaceShell.tsx'), 'utf-8')
-    expect(shell).toMatch(/import \{ enabledViews \} from '\.\/slots'/)
+    expect(shell).toMatch(/import \{ enabledViews, initialActiveView \} from '\.\/slots'/)
     expect(shell).toMatch(/<Inspector/)
     expect(shell).not.toMatch(/<GraphCanvas/)
     expect(shell).not.toMatch(/<NetworkCanvas/)
@@ -1331,10 +1332,16 @@ describe('Feature flag rollout control (D3 / REQ-OR-260011)', () => {
     expect(barrel).toContain('GraphCanvas')
   })
 
-  it('default view is the first enabled view (Flow when Network is gated off)', () => {
+  it('default view derives from homeEmphasis via initialActiveView (ADR-260065)', () => {
     const shell = fs.readFileSync(path.join(SRC, 'ui-shell', 'WorkspaceShell.tsx'), 'utf-8')
-    // Default is the first enabled view; with Network gated off by the flag, Flow remains.
-    expect(shell).toMatch(/useState<string>\(enabledViews\[0\]/)
+    // The landing view is the emphasis-derived one (compute → Flow, relationship → Network,
+    // falling back to the first enabled view) — no longer positional enabledViews[0].
+    expect(shell).toMatch(/useState<string>\(initialActiveView\(/)
+    expect(shell).toContain('preferences.homeEmphasis')
+    const viewReg = fs.readFileSync(path.join(SRC, 'ui-shell', 'slots', 'view-registry.ts'), 'utf-8')
+    expect(viewReg).toContain('export function initialActiveView')
+    const slotsIndex = fs.readFileSync(path.join(SRC, 'ui-shell', 'slots', 'index.ts'), 'utf-8')
+    expect(slotsIndex).toContain('initialActiveView')
   })
 })
 
@@ -1977,7 +1984,10 @@ describe('Canonical selectedAtomId selection sync — Flow view (BI-260043 / REQ
     const canvas = fs.readFileSync(
       path.join(FEATURES, 'workspace-graph', 'GraphCanvas.tsx'), 'utf-8',
     )
-    expect(canvas).toMatch(/\[laidNodes,\s*selectedAtomId,\s*setNodes\]/)
+    // Since ADR-260065 the selection (+ badge) mapping lives in decorateNodes, whose
+    // dependency list carries selectedAtomId; the effect depends on it transitively.
+    expect(canvas).toMatch(/\[laidNodes,\s*decorateNodes,\s*setNodes\]/)
+    expect(canvas).toMatch(/decorateNodes = useCallback[\s\S]{0,400}\[selectedAtomId/)
   })
 })
 
@@ -2127,8 +2137,10 @@ describe('Flow view relayout control (D3 / REQ-FR-260045)', () => {
     const canvas = fs.readFileSync(
       path.join(FEATURES, 'workspace-graph', 'GraphCanvas.tsx'), 'utf-8',
     )
-    // handleRelayout maps selectedAtomId onto nodes
-    expect(canvas).toMatch(/handleRelayout[\s\S]{0,200}selectedAtomId/)
+    // handleRelayout runs the shared decorateNodes mapping, which carries selectedAtomId
+    // (ADR-260065 moved selection + badge stamping into that one helper).
+    expect(canvas).toMatch(/handleRelayout[\s\S]{0,200}decorateNodes/)
+    expect(canvas).toMatch(/decorateNodes[\s\S]{0,300}selectedAtomId/)
   })
 
   it('GraphCanvas uses mergeNodePositions for drag-position preservation (REQ-FR-260045)', () => {
@@ -2902,5 +2914,86 @@ describe('Categories navigator registration and contracts (ADR-260064 / EPIC-260
     const shell = fs.readFileSync(path.join(SRC, 'ui-shell', 'WorkspaceShell.tsx'), 'utf-8')
     expect(shell).toContain('categoryFacets')
     expect(shell).toContain('FacetChips')
+  })
+})
+
+// --- EPIC-260069: Compute — formula builder, transparency & Flow visualization (ADR-260065 / REQ-FR-260073) ---
+
+describe('Compute authoring and transparency (ADR-260065 / EPIC-260069)', () => {
+  it('inspector registry registers the Compute tab from the workspace-compute barrel, after Classify', () => {
+    const inspectorReg = fs.readFileSync(path.join(SRC, 'ui-shell', 'slots', 'inspector-registry.ts'), 'utf-8')
+    expect(inspectorReg).toContain('ComputeTab')
+    expect(inspectorReg).toMatch(/id:\s*'compute'/)
+    expect(inspectorReg).toMatch(/from '\.\.\/\.\.\/features\/workspace-compute'/)
+    expect(inspectorReg.indexOf("id: 'compute'")).toBeGreaterThan(inspectorReg.indexOf("id: 'classify'"))
+  })
+
+  it('RETRIEVE_QUERY selects the evaluation-reporting fields (optional on Atom, mock-compat)', () => {
+    const queries = fs.readFileSync(path.join(SRC, 'api-contract', 'graph-queries.ts'), 'utf-8')
+    expect(queries).toContain('evaluationStatus')
+    expect(queries).toContain('cycleNodes')
+    expect(queries).toContain('cycleEdges')
+    // Optional modelling — existing mocks/older responses stay valid.
+    expect(queries).toMatch(/evaluationStatus\?:/)
+    expect(queries).toMatch(/causes\?:/)
+  })
+
+  it('slot contracts carry the additive ADR-260065 extensions only', () => {
+    const types = fs.readFileSync(path.join(SRC, 'ui-shell', 'slots', 'slot-types.ts'), 'utf-8')
+    // ViewProps gains the badge preference; InspectorTabProps gains the working set — both optional.
+    expect(types).toMatch(/computeBadges\?:\s*'always'\s*\|\s*'onDemand'/)
+    expect(types).toMatch(/atoms\?:\s*Atom\[\]/)
+  })
+
+  it('api-contract exposes the payload/status/discovery contract through the barrel', () => {
+    const barrel = fs.readFileSync(path.join(SRC, 'api-contract', 'index.ts'), 'utf-8')
+    for (const name of ['parseOperation', 'serializeOperation', 'computeStatusFor', 'DISCOVER_OPERATIONS_QUERY']) {
+      expect(barrel).toContain(name)
+    }
+  })
+
+  it('AtomNode renders the badge from computeStatus in the reserved region — never color alone', () => {
+    const node = fs.readFileSync(path.join(FEATURES, 'workspace-graph', 'AtomNode.tsx'), 'utf-8')
+    const badges = node.slice(node.indexOf('function NodeBadges'))
+    expect(badges).toContain('aria-label')
+    expect(badges).toContain('title')
+    // The reserved-seam gate stays: undefined computeStatus renders nothing.
+    expect(badges).toMatch(/computeStatus === undefined\) return null/)
+  })
+
+  it('the shell wires the emphasis preferences: initial view + badge visibility', () => {
+    const shell = fs.readFileSync(path.join(SRC, 'ui-shell', 'WorkspaceShell.tsx'), 'utf-8')
+    expect(shell).toContain('initialActiveView(')
+    expect(shell).toContain('computeBadges={preferences.computeBadges}')
+  })
+
+  it('GraphCanvas stamps computeStatus and danger-styles cycle edges (Flow-only seam)', () => {
+    const canvas = fs.readFileSync(path.join(FEATURES, 'workspace-graph', 'GraphCanvas.tsx'), 'utf-8')
+    expect(canvas).toContain('computeStatusFor')
+    expect(canvas).toContain('applyCycleStyling')
+    expect(canvas).toContain('cycleEdgeKeys')
+    // Flow-only: the Network canvas and circle node carry no badge/cycle wiring (ADR-260065).
+    const network = fs.readFileSync(path.join(FEATURES, 'workspace-graph', 'NetworkCanvas.tsx'), 'utf-8')
+    const circle = fs.readFileSync(path.join(FEATURES, 'workspace-graph', 'CircleAtomNode.tsx'), 'utf-8')
+    for (const src of [network, circle]) {
+      expect(src).not.toContain('computeStatus')
+      expect(src).not.toContain('applyCycleStyling')
+    }
+  })
+
+  it('ComputeTab declares a local props slice and imports neither ui-shell nor other features', () => {
+    const tabPath = path.join(FEATURES, 'workspace-compute', 'ComputeTab.tsx')
+    for (const imp of extractImports(tabPath)) {
+      expect(imp).not.toContain('ui-shell')
+    }
+    const tab = fs.readFileSync(tabPath, 'utf-8')
+    expect(tab).toMatch(/interface ComputeTabProps/)
+  })
+
+  it('compute E2E spec exists and covers authoring + status', () => {
+    expect(fs.existsSync(path.join(ROOT, 'e2e', 'compute.spec.ts'))).toBe(true)
+    const spec = fs.readFileSync(path.join(ROOT, 'e2e', 'compute.spec.ts'), 'utf-8')
+    expect(spec).toContain('discoverOperations')
+    expect(spec).toMatch(/"name":"SUM"|\\"name\\":\\"SUM\\"/)
   })
 })

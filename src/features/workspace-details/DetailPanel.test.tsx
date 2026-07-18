@@ -23,6 +23,28 @@ function makeAtom(overrides?: Partial<Atom>): Atom {
   }
 }
 
+describe('DetailPanel — manual-vs-computed hard fork (ADR-260065)', () => {
+  function computedAtom(): Atom {
+    const atom = makeAtom()
+    atom.properties.nuclearies.operation = '{"name":"SUM","args":["a-2"]}'
+    return atom
+  }
+
+  it('renders content read-only with the computed-result notice for a computed atom', () => {
+    render(<DetailPanel atom={computedAtom()} onUpdate={vi.fn()} onDelete={vi.fn()} onClose={vi.fn()} />)
+    expect(screen.getByLabelText(/content/i)).toHaveAttribute('readonly')
+    expect(screen.getByText(/Computed result/)).toBeInTheDocument()
+    // Title/description stay editable — the Compute tab owns only the computed value.
+    expect(screen.getByLabelText(/title/i)).not.toHaveAttribute('readonly')
+  })
+
+  it('keeps content editable with no notice for a manual atom', () => {
+    render(<DetailPanel atom={makeAtom()} onUpdate={vi.fn()} onDelete={vi.fn()} onClose={vi.fn()} />)
+    expect(screen.getByLabelText(/content/i)).not.toHaveAttribute('readonly')
+    expect(screen.queryByText(/Computed result/)).not.toBeInTheDocument()
+  })
+})
+
 describe('DetailPanel — edit mode', () => {
   it('renders atom details in editable form', () => {
     render(

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   ReactFlow,
   Background,
@@ -9,8 +9,10 @@ import {
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import type { Node, Edge } from '@xyflow/react'
+import { computeStatusFor } from '../../api-contract'
+import type { ComputeStatus } from '../../api-contract'
 import type { GraphData } from './use-graph-data'
-import { atomsToNodes, atomsToFlowEdges, mergeNodePositions } from './graph-types'
+import { atomsToNodes, atomsToFlowEdges, mergeNodePositions, cycleEdgeKeys, applyCycleStyling } from './graph-types'
 import { FLOW_ELIGIBLE_BONDS, getFlowParticipantIds } from './flow-projection'
 import { applyFlowLayout } from './use-flow-layout'
 import { AtomNode } from './AtomNode'
@@ -28,11 +30,13 @@ export interface GraphCanvasProps {
   onSelectAtom: (id: string | null) => void
   onCreateAtom: () => void
   renderMode?: 'full' | 'reduced'
+  /** Badge visibility preference (ADR-260065): absent = 'always'; 'onDemand' = selected atom only. */
+  computeBadges?: 'always' | 'onDemand'
 }
 
 const nodeTypes = { atom: AtomNode }
 
-export function GraphCanvas({ data, selectedAtomId, onSelectAtom, onCreateAtom }: GraphCanvasProps) {
+export function GraphCanvas({ data, selectedAtomId, onSelectAtom, onCreateAtom, computeBadges }: GraphCanvasProps) {
   const { atoms, loading, error, createAtom, deleteAtom, addBond, removeBond } = data
 
   // Default is Focused mode (eligible-bond projection only — D1/D2 / ADR-260040)
@@ -54,8 +58,12 @@ export function GraphCanvas({ data, selectedAtomId, onSelectAtom, onCreateAtom }
     [atoms, participantIds, flowMode],
   )
 
-  // Edges always from eligible bonds — non-flow atoms have no eligible bonds to contribute (D4 / ADR-260040)
-  const flowEdges = useMemo(() => atomsToFlowEdges(atoms, eligibleSet), [atoms, eligibleSet])
+  // Edges always from eligible bonds — non-flow atoms have no eligible bonds to contribute (D4 / ADR-260040).
+  // Edges on a reported dependency cycle get danger styling (ADR-260065 / EPIC-260069).
+  const flowEdges = useMemo(
+    () => applyCycleStyling(atomsToFlowEdges(atoms, eligibleSet), cycleEdgeKeys(atoms)),
+    [atoms, eligibleSet],
+  )
 
   // Non-flow atoms in include mode carry isNonFlowAtom=true for visual distinction (D4 / REQ-FR-260047)
   const rawNodes = useMemo(
@@ -79,19 +87,32 @@ export function GraphCanvas({ data, selectedAtomId, onSelectAtom, onCreateAtom }
     setEdges(flowEdges)
   }, [flowEdges, setEdges])
 
+  // Compute-status badge model per atom (ADR-260065), stamped into the reserved badges seam.
+  const statusById = useMemo(() => {
+    const map = new Map<string, ComputeStatus | undefined>()
+    for (const atom of atoms) map.set(atom.properties.shellies.uuid, computeStatusFor(atom))
+    return map
+  }, [atoms])
+
+  // Selection + badge stamping happen here (not in rawNodes) so the layout memo above never
+  // reruns on selection changes (D3 / REQ-FR-260045). `onDemand` badges only the selected atom.
+  const badgeMode = computeBadges ?? 'always'
+  const decorateNodes = useCallback((ns: Node[]) => ns.map((n) => {
+    const showBadge = badgeMode === 'always' || n.id === selectedAtomId
+    return {
+      ...n,
+      selected: n.id === selectedAtomId,
+      data: { ...n.data, computeStatus: showBadge ? statusById.get(n.id) : undefined },
+    }
+  }), [selectedAtomId, badgeMode, statusById])
+
   useEffect(() => {
-    setNodes((prev) => {
-      const merged = mergeNodePositions(laidNodes, prev)
-      return merged.map((n) => ({ ...n, selected: n.id === selectedAtomId }))
-    })
-  }, [laidNodes, selectedAtomId, setNodes])
+    setNodes((prev) => decorateNodes(mergeNodePositions(laidNodes, prev)))
+  }, [laidNodes, decorateNodes, setNodes])
 
   // Relayout preserves selectedAtomId and drag-repositioned nodes remain moveable afterward (D3 / REQ-FR-260045)
   function handleRelayout() {
-    setNodes(
-      applyFlowLayout(rawNodes, flowEdges)
-        .map((n) => ({ ...n, selected: n.id === selectedAtomId })),
-    )
+    setNodes(decorateNodes(applyFlowLayout(rawNodes, flowEdges)))
   }
 
   function toggleFlowMode() {

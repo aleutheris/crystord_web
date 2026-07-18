@@ -2,6 +2,20 @@ import { test, expect } from '@playwright/test'
 
 // EPIC-260071 / ADR-260062: Table center view — tri-view registration, sorted rows with a
 // computed indicator, shared selection, inline edit via the change mutation, VIEWER gating.
+// Evaluation-reporting fields selected by RETRIEVE_QUERY since ADR-260065 — mocked on every
+// atom so Apollo logs no missing-field warnings.
+function evaluationFields(uuid: string) {
+  return {
+    evaluationStatus: 'success',
+    errorCode: null,
+    causes: [],
+    cycleNodes: [],
+    cycleEdges: null,
+    originNodeUuid: uuid,
+    affectedNodeUuid: uuid,
+  }
+}
+
 function mockGraphQL(page: import('@playwright/test').Page) {
   const atoms = [
     {
@@ -10,6 +24,7 @@ function mockGraphQL(page: import('@playwright/test').Page) {
       ownerUuid: 'owner-1',
       accessLevel: 'OWNER',
       categories: [],
+      ...evaluationFields('atom-1'),
       properties: {
         shellies: { uuid: 'atom-1' },
         nuclearies: { title: 'Alpha', description: 'First', content: 'Alpha body', operation: '', constants: {} },
@@ -21,6 +36,7 @@ function mockGraphQL(page: import('@playwright/test').Page) {
       ownerUuid: 'owner-1',
       accessLevel: 'OWNER',
       categories: [],
+      ...evaluationFields('atom-2'),
       properties: {
         shellies: { uuid: 'atom-2' },
         nuclearies: { title: 'Gamma', description: 'Computed', content: '42', operation: '{"name":"SUM","args":[]}', constants: {} },
@@ -32,6 +48,7 @@ function mockGraphQL(page: import('@playwright/test').Page) {
       ownerUuid: 'owner-2',
       accessLevel: 'VIEWER',
       categories: [],
+      ...evaluationFields('atom-3'),
       properties: {
         shellies: { uuid: 'atom-3' },
         nuclearies: { title: 'Beta', description: 'Shared read-only', content: 'Beta body', operation: '', constants: {} },

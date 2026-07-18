@@ -13,13 +13,13 @@ interface InspectorProps {
  * Right-rail inspector — a tabbed, collapsible host (ADR-260061 / EPIC-260066 T6).
  *
  * Appears when an atom is selected (selection comes from context). Renders a tab strip from the
- * inspector-tab registry (Details today; Classify/Compute/History/Share register in later
+ * inspector-tab registry (Details/Classify/Compute today; History/Share register in later
  * epics) and the active tab's component in a tabpanel. Collapsed state persists via preferences.
  * The wrapper is intentionally not a landmark — the active tab (e.g. DetailPanel) provides its
  * own complementary region, so it is not nested.
  */
 export function Inspector({ onUpdate, onDelete }: InspectorProps) {
-  const { selection, preferences } = useWorkspace()
+  const { selection, workingSet, preferences } = useWorkspace()
   const [activeTabId, setActiveTabId] = useState<string>(inspectorTabs[0]?.id ?? 'details')
 
   const atom = selection.selectedAtom
@@ -108,6 +108,7 @@ export function Inspector({ onUpdate, onDelete }: InspectorProps) {
           <TabComponent
             key={atom.properties.shellies.uuid}
             atom={atom}
+            atoms={workingSet.atoms}
             onUpdate={onUpdate}
             onDelete={onDelete}
             onClose={() => selection.select(null)}

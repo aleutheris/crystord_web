@@ -30,6 +30,9 @@ export function DetailPanel({ atom, isCreationMode, onCreate, onUpdate, onDelete
   const canEdit = Boolean(isCreationMode) || perms.canEdit
   const canDelete = !isCreationMode && perms.canDelete && Boolean(onDelete)
   const readOnly = !canEdit
+  // Manual-vs-computed hard fork (ADR-260065 / EPIC-260069): a non-empty operation means the
+  // Compute tab owns the value — content renders read-only here as the computed result.
+  const isComputed = !isCreationMode && Boolean(atom?.properties.nuclearies.operation)
 
   async function handleSave(e: FormEvent) {
     e.preventDefault()
@@ -105,7 +108,12 @@ export function DetailPanel({ atom, isCreationMode, onCreate, onUpdate, onDelete
         </div>
         <div>
           <label htmlFor="detail-content" style={{ fontSize: '0.8rem', fontWeight: 600 }}>Content</label>
-          <textarea id="detail-content" value={content} onChange={(e) => setContent(e.target.value)} rows={4} readOnly={readOnly} style={{ width: '100%', padding: '0.4rem', boxSizing: 'border-box', resize: 'vertical' }} />
+          <textarea id="detail-content" value={content} onChange={(e) => setContent(e.target.value)} rows={4} readOnly={readOnly || isComputed} style={{ width: '100%', padding: '0.4rem', boxSizing: 'border-box', resize: 'vertical' }} />
+          {isComputed && (
+            <p role="status" style={{ margin: '0.2rem 0 0', fontSize: '0.72rem', color: C_TEXT_MUTED }}>
+              Computed result — this value comes from the atom's formula (see the Compute tab).
+            </p>
+          )}
         </div>
 
         <div style={{ display: 'flex', gap: '0.5rem', marginTop: 'auto' }}>

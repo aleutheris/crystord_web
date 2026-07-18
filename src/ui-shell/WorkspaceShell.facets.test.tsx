@@ -69,6 +69,7 @@ vi.mock('@xyflow/react', () => ({
 // A minimal registry: one view and one navigator that proposes a facet filter on click.
 vi.mock('./slots', () => ({
   enabledViews: [{ id: 'flow', label: 'Flow', Component: () => <div data-testid="view" /> }],
+  initialActiveView: () => 'flow',
   inspectorTabs: [],
   navigators: [
     {

@@ -1,5 +1,19 @@
 import { test, expect } from '@playwright/test'
 
+// Evaluation-reporting fields selected by RETRIEVE_QUERY since ADR-260065 — mocked on every
+// atom so Apollo logs no missing-field warnings.
+function evaluationFields(uuid: string) {
+  return {
+    evaluationStatus: 'success',
+    errorCode: null,
+    causes: [],
+    cycleNodes: [],
+    cycleEdges: null,
+    originNodeUuid: uuid,
+    affectedNodeUuid: uuid,
+  }
+}
+
 function mockGraphQL(page: import('@playwright/test').Page) {
   const atoms = [
     {
@@ -8,6 +22,7 @@ function mockGraphQL(page: import('@playwright/test').Page) {
       ownerUuid: 'owner-1',
       accessLevel: 'OWNER',
       categories: [],
+      ...evaluationFields('atom-1'),
       properties: {
         shellies: { uuid: 'atom-1' },
         nuclearies: { title: 'Alpha', description: 'First', content: 'Active', operation: '', constants: {} },
@@ -19,6 +34,7 @@ function mockGraphQL(page: import('@playwright/test').Page) {
       ownerUuid: 'owner-1',
       accessLevel: 'OWNER',
       categories: [],
+      ...evaluationFields('atom-2'),
       properties: {
         shellies: { uuid: 'atom-2' },
         nuclearies: { title: 'Beta', description: 'Second', content: 'Pending', operation: '', constants: {} },
@@ -30,6 +46,7 @@ function mockGraphQL(page: import('@playwright/test').Page) {
       ownerUuid: 'owner-1',
       accessLevel: 'OWNER',
       categories: [],
+      ...evaluationFields('atom-3'),
       properties: {
         shellies: { uuid: 'atom-3' },
         nuclearies: { title: 'Gamma', description: 'Third', content: 'Done', operation: '', constants: {} },
@@ -110,6 +127,9 @@ function mockGraphQL(page: import('@playwright/test').Page) {
 }
 
 async function signIn(page: import('@playwright/test').Page) {
+  // These scenarios assert atom visibility on the Network canvas; the compute default now
+  // lands on Flow (ADR-260065), so prime the relationship emphasis before navigation.
+  await page.addInitScript(() => localStorage.setItem('crystord-home-emphasis', 'relationship'))
   await page.goto('/')
   await expect(page.getByRole('heading', { name: /sign in/i })).toBeVisible()
   const responsePromise = page.waitForResponse((r) =>
@@ -287,6 +307,7 @@ test.describe('Search and discoverability', () => {
       ownerUuid: 'owner-1',
       accessLevel: 'OWNER',
       categories: [],
+      ...evaluationFields('atom-2'),
       properties: {
         shellies: { uuid: 'atom-2' },
         nuclearies: { title: 'Beta', description: 'Second', content: 'Pending', operation: '', constants: {} },

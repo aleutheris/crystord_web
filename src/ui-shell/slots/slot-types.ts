@@ -20,6 +20,12 @@ export interface ViewProps {
   onSelectAtom: (id: string | null) => void
   onCreateAtom: () => void
   renderMode?: 'full' | 'reduced'
+  /**
+   * Compute-badge visibility preference (ADR-260065, additive): `always` shows status badges
+   * on every computed atom, `onDemand` only on the selected one. Optional — non-graph views
+   * and older callers ignore it; absent means `always`.
+   */
+  computeBadges?: 'always' | 'onDemand'
 }
 
 /** A center view-host entry (Flow, Network, Table, Board, …). */
@@ -37,6 +43,12 @@ export interface InspectorTabProps {
   onUpdate: (uuid: string, atom: Atom) => Promise<void>
   onDelete: (uuid: string) => void
   onClose: () => void
+  /**
+   * The current working set (ADR-260065, additive): the Inspector passes `workingSet.atoms`
+   * so tabs can resolve atom references to titles (Compute's picker/Explain). Optional —
+   * existing tabs ignore it.
+   */
+  atoms?: Atom[]
 }
 
 /** A right-rail inspector tab (Details, Classify, Compute, History, Share, …). */

@@ -19,6 +19,20 @@ const REGION_CHILDREN = [
   },
 ]
 
+// Evaluation-reporting fields selected by RETRIEVE_QUERY since ADR-260065 — mocked on every
+// atom so Apollo logs no missing-field warnings.
+function evaluationFields(uuid: string) {
+  return {
+    evaluationStatus: 'success',
+    errorCode: null,
+    causes: [],
+    cycleNodes: [],
+    cycleEdges: null,
+    originNodeUuid: uuid,
+    affectedNodeUuid: uuid,
+  }
+}
+
 function mockGraphQL(page: import('@playwright/test').Page) {
   const atoms = [
     {
@@ -27,6 +41,7 @@ function mockGraphQL(page: import('@playwright/test').Page) {
       ownerUuid: 'owner-1',
       accessLevel: 'OWNER',
       categories: [{ dimensionKey: 'region', valueKey: 'europe' }],
+      ...evaluationFields('atom-1'),
       properties: {
         shellies: { uuid: 'atom-1' },
         nuclearies: { title: 'Alpha', description: 'First', content: 'Alpha body', operation: '', constants: {} },

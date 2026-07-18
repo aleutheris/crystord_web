@@ -69,3 +69,35 @@ describe('AtomNode', () => {
     expect(container.querySelector('[data-node-region="badges"]')).not.toBeNull()
   })
 })
+
+describe('AtomNode compute-status badge (ADR-260065 / EPIC-260069)', () => {
+  it.each([
+    ['ok', 'Up to date', '✓ OK'],
+    ['error', 'Division by zero', '⚠ Error'],
+    ['skipped', 'Skipped — optional input absent', '⏭ Skipped'],
+  ])('renders the %s badge with glyph + text and the summary as title/aria-label', (kind, summary, label) => {
+    const { container } = render(
+      <AtomNode {...makeProps({ title: 'Alpha', labels: [], computeStatus: { kind, summary } })} />,
+    )
+    const region = container.querySelector('[data-node-region="badges"]')!
+    expect(region).not.toBeNull()
+    // Never color alone: glyph + short text, summary spelled out for AT and hover.
+    expect(region.textContent).toContain(label)
+    expect(screen.getByLabelText(summary)).toBeInTheDocument()
+    expect(screen.getByTitle(summary)).toBeInTheDocument()
+  })
+
+  it.each([
+    ['a non-status string', 'ok'],
+    ['a null value', null],
+    ['an unknown kind', { kind: 'meh', summary: 'x' }],
+    ['a missing summary', { kind: 'ok' }],
+  ])('keeps the region an empty seam for %s', (_label, computeStatus) => {
+    const { container } = render(
+      <AtomNode {...makeProps({ title: 'Alpha', labels: [], computeStatus })} />,
+    )
+    const region = container.querySelector('[data-node-region="badges"]')!
+    expect(region).not.toBeNull()
+    expect(region.textContent).toBe('')
+  })
+})

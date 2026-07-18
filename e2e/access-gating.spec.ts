@@ -13,6 +13,14 @@ function atom(uuid: string, title: string, accessLevel: 'OWNER' | 'EDITOR' | 'VI
     ownerUuid: 'owner-x',
     accessLevel,
     categories: [],
+    // Evaluation-reporting fields (ADR-260065) — selected by RETRIEVE_QUERY since EPIC-260069.
+    evaluationStatus: 'success',
+    errorCode: null,
+    causes: [],
+    cycleNodes: [],
+    cycleEdges: null,
+    originNodeUuid: uuid,
+    affectedNodeUuid: uuid,
     properties: {
       shellies: { uuid },
       nuclearies: { title, description: 'D', content: 'C', operation: '', constants: {} },
@@ -51,6 +59,9 @@ function mockGraphQL(page: Page) {
 }
 
 async function signInAndSearch(page: Page) {
+  // These scenarios select atoms on the Network canvas; the compute default now lands on
+  // Flow (ADR-260065), so prime the relationship emphasis before navigation.
+  await page.addInitScript(() => localStorage.setItem('crystord-home-emphasis', 'relationship'))
   await page.goto('/')
   await expect(page.getByRole('heading', { name: /sign in/i })).toBeVisible()
   const signedIn = page.waitForResponse(

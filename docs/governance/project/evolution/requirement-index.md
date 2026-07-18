@@ -115,6 +115,7 @@ A terminal requirement (`Superseded by <id>` / `Withdrawn`) keeps a tombstone ro
 | REQ-FR-260070 | Table View as a Registered Center View with Inline Editing | FR | Active | ADR-260062, ADR-260032 | EPIC-260071 |
 | REQ-FR-260071 | Classify Inspector with Label and Category Chip Editing | FR | Active | ADR-260063 | EPIC-260067 |
 | REQ-FR-260072 | Categories Navigator with Faceted Working-Set Scoping | FR | Active | ADR-260064 | EPIC-260068 |
+| REQ-FR-260073 | Compute Formula Builder with Evaluation Transparency | FR | Active | ADR-260065 | EPIC-260069 |
 
 ## Superseded
 

@@ -21,6 +21,13 @@ export const RETRIEVE_QUERY = gql`
         name
         direction
       }
+      evaluationStatus
+      errorCode
+      causes
+      cycleNodes
+      cycleEdges
+      originNodeUuid
+      affectedNodeUuid
       properties {
         shellies {
           uuid
@@ -116,6 +123,24 @@ export interface Atom {
    * `categories` only when present — AtomInput replace-all semantics (ADR-260063).
    */
   categories?: AtomCategoryAssignment[]
+  /**
+   * Evaluation reporting (ADR-260065 / EPIC-260069). All untyped in the schema and modelled
+   * optional for mock-compat (the ownerUuid pattern above). `evaluationStatus` is one of
+   * 'success' | 'failed-origin' | 'failed-propagated' | 'skipped-optional' when present;
+   * unknown values map to no badge (`compute-status.ts` never guesses). The computed result
+   * itself rides in `content` — there is no separate result field.
+   */
+  evaluationStatus?: string | null
+  /** Failure code (e.g. 'AU-CYCLE-DETECTED', 'OP-DIVISION-BY-ZERO'). */
+  errorCode?: string | null
+  /** UUIDs of the failing dependencies (failed-propagated). */
+  causes?: string[] | null
+  /** Cycle member UUIDs (AU-CYCLE-DETECTED). */
+  cycleNodes?: string[] | null
+  /** Cycle edges — the JSON scalar arrives as a {from,to} pair list. */
+  cycleEdges?: { from: string; to: string }[] | null
+  originNodeUuid?: string | null
+  affectedNodeUuid?: string | null
 }
 
 export interface RetrieveResponse {

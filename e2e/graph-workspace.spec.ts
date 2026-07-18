@@ -1,5 +1,19 @@
 import { test, expect } from '@playwright/test'
 
+// Evaluation-reporting fields selected by RETRIEVE_QUERY since ADR-260065 — mocked on every
+// atom so Apollo logs no missing-field warnings.
+function evaluationFields(uuid: string) {
+  return {
+    evaluationStatus: 'success',
+    errorCode: null,
+    causes: [],
+    cycleNodes: [],
+    cycleEdges: null,
+    originNodeUuid: uuid,
+    affectedNodeUuid: uuid,
+  }
+}
+
 function mockGraphQL(page: import('@playwright/test').Page) {
   const atoms = [
     {
@@ -8,6 +22,7 @@ function mockGraphQL(page: import('@playwright/test').Page) {
       ownerUuid: 'owner-1',
       accessLevel: 'OWNER',
       categories: [],
+      ...evaluationFields('atom-1'),
       properties: {
         shellies: { uuid: 'atom-1' },
         nuclearies: { title: 'Alpha', description: 'First', content: 'Active', operation: '', constants: {} },
@@ -19,6 +34,7 @@ function mockGraphQL(page: import('@playwright/test').Page) {
       ownerUuid: 'owner-1',
       accessLevel: 'OWNER',
       categories: [],
+      ...evaluationFields('atom-2'),
       properties: {
         shellies: { uuid: 'atom-2' },
         nuclearies: { title: 'Beta', description: 'Second', content: 'Pending', operation: '', constants: {} },
@@ -103,6 +119,13 @@ async function signIn(page: import('@playwright/test').Page) {
   await responsePromise
 }
 
+// The compute default (ADR-260065) lands on Flow, whose focused projection hides atoms
+// without OP_DEPENDENCY bonds. Tests exercising the Network canvas prime the relationship
+// emphasis BEFORE navigation so Network stays the landing view for them.
+function primeRelationshipEmphasis(page: import('@playwright/test').Page) {
+  return page.addInitScript(() => localStorage.setItem('crystord-home-emphasis', 'relationship'))
+}
+
 async function submitSearch(page: import('@playwright/test').Page) {
   const retrieveResponse = page.waitForResponse(
     (r) => /\/(api|graphql)\b/.test(r.url()) && r.request().postData()?.includes('retrieve') === true,
@@ -139,6 +162,7 @@ test.describe('Graph workspace', () => {
 
   test('atoms appear in graph only after explicit search', async ({ page }) => {
     await mockGraphQL(page)
+    await primeRelationshipEmphasis(page)
     await signIn(page)
 
     await expect(page.getByText('Alpha')).not.toBeVisible()
@@ -152,6 +176,7 @@ test.describe('Graph workspace', () => {
 
   test('opens detail panel when clicking an atom node', async ({ page }) => {
     await mockGraphQL(page)
+    await primeRelationshipEmphasis(page)
     await signIn(page)
     await submitSearch(page)
 
@@ -166,6 +191,7 @@ test.describe('Graph workspace', () => {
 
   test('closes detail panel', async ({ page }) => {
     await mockGraphQL(page)
+    await primeRelationshipEmphasis(page)
     await signIn(page)
     await submitSearch(page)
 
@@ -178,6 +204,7 @@ test.describe('Graph workspace', () => {
 
   test('switches detail panel between atoms', async ({ page }) => {
     await mockGraphQL(page)
+    await primeRelationshipEmphasis(page)
     await signIn(page)
     await submitSearch(page)
 
@@ -191,6 +218,7 @@ test.describe('Graph workspace', () => {
 
   test('edits atom properties via detail panel save', async ({ page }) => {
     await mockGraphQL(page)
+    await primeRelationshipEmphasis(page)
     await signIn(page)
     await submitSearch(page)
 
@@ -214,6 +242,7 @@ test.describe('Graph workspace', () => {
 
   test('shows delete confirmation dialog and cancellation preserves atom', async ({ page }) => {
     await mockGraphQL(page)
+    await primeRelationshipEmphasis(page)
     await signIn(page)
     await submitSearch(page)
 
@@ -237,6 +266,7 @@ test.describe('Graph workspace', () => {
 
   test('delete confirmation dispatches destroy mutation', async ({ page }) => {
     await mockGraphQL(page)
+    await primeRelationshipEmphasis(page)
     await signIn(page)
     await submitSearch(page)
 
@@ -258,33 +288,46 @@ test.describe('Graph workspace', () => {
     await expect(page.getByRole('button', { name: /sign out/i })).toBeVisible()
   })
 
-  test('shows Network view as default after sign-in', async ({ page }) => {
+  test('shows Flow view as default after sign-in under compute emphasis', async ({ page }) => {
     await mockGraphQL(page)
+    await signIn(page)
+
+    // ADR-260065: the compute default emphasis lands on Flow (the differentiator view).
+    await expect(page.getByRole('tab', { name: 'Flow' })).toHaveAttribute('aria-selected', 'true')
+    await expect(page.getByRole('tab', { name: 'Network' })).toHaveAttribute('aria-selected', 'false')
+  })
+
+  test('shows Network view as default when home emphasis is relationship', async ({ page }) => {
+    await mockGraphQL(page)
+    await primeRelationshipEmphasis(page)
     await signIn(page)
 
     await expect(page.getByRole('tab', { name: 'Network' })).toHaveAttribute('aria-selected', 'true')
     await expect(page.getByRole('tab', { name: 'Flow' })).toHaveAttribute('aria-selected', 'false')
   })
 
-  test('can switch to Flow view by clicking the Flow tab', async ({ page }) => {
+  test('can switch to Network view by clicking the Network tab', async ({ page }) => {
     await mockGraphQL(page)
     await signIn(page)
 
-    await page.getByRole('tab', { name: 'Flow' }).click()
-    await expect(page.getByRole('tab', { name: 'Flow' })).toHaveAttribute('aria-selected', 'true')
-    await expect(page.getByRole('tab', { name: 'Network' })).toHaveAttribute('aria-selected', 'false')
+    await page.getByRole('tab', { name: 'Network' }).click()
+    await expect(page.getByRole('tab', { name: 'Network' })).toHaveAttribute('aria-selected', 'true')
+    await expect(page.getByRole('tab', { name: 'Flow' })).toHaveAttribute('aria-selected', 'false')
   })
 
-  test('can switch views with ArrowRight keyboard navigation on tablist', async ({ page }) => {
+  test('can switch views with ArrowRight and ArrowLeft keyboard navigation on tablist', async ({ page }) => {
     await mockGraphQL(page)
     await signIn(page)
 
     // Scoped: the left-rail lens switcher (ADR-260064) is a second tablist on the page.
     await page.getByRole('tablist', { name: 'Graph view' }).focus()
-    await page.keyboard.press('ArrowRight')
     await expect(page.getByRole('tab', { name: 'Flow' })).toHaveAttribute('aria-selected', 'true')
     await page.keyboard.press('ArrowLeft')
     await expect(page.getByRole('tab', { name: 'Network' })).toHaveAttribute('aria-selected', 'true')
+    await page.keyboard.press('ArrowRight')
+    await expect(page.getByRole('tab', { name: 'Flow' })).toHaveAttribute('aria-selected', 'true')
+    await page.keyboard.press('ArrowRight')
+    await expect(page.getByRole('tab', { name: 'Table' })).toHaveAttribute('aria-selected', 'true')
   })
 
   test('workspace remains functional after mutation error', async ({ page }) => {
@@ -337,6 +380,7 @@ test.describe('Graph workspace', () => {
                   ownerUuid: 'owner-1',
                   accessLevel: 'OWNER',
                   categories: [],
+                  ...evaluationFields('atom-1'),
                   properties: {
                     shellies: { uuid: 'atom-1' },
                     nuclearies: { title: 'Alpha', description: '', content: '', operation: '', constants: {} },
@@ -358,6 +402,7 @@ test.describe('Graph workspace', () => {
       return route.continue()
     })
 
+    await primeRelationshipEmphasis(page)
     await signIn(page)
     await submitSearch(page)
     await expect(page.getByText('Alpha')).toBeVisible()

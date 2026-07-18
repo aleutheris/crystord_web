@@ -18,6 +18,20 @@ const VALUES = [
 // The change input carries only valueKeys (replace-all); the echo needs the dimension back.
 const VALUE_DIMENSIONS: Record<string, string> = { europe: 'region', belgium: 'region', germany: 'region', q1: 'period' }
 
+// Evaluation-reporting fields selected by RETRIEVE_QUERY since ADR-260065 — mocked on every
+// atom so Apollo logs no missing-field warnings.
+function evaluationFields(uuid: string) {
+  return {
+    evaluationStatus: 'success',
+    errorCode: null,
+    causes: [],
+    cycleNodes: [],
+    cycleEdges: null,
+    originNodeUuid: uuid,
+    affectedNodeUuid: uuid,
+  }
+}
+
 function mockGraphQL(page: import('@playwright/test').Page) {
   const atoms = [
     {
@@ -26,6 +40,7 @@ function mockGraphQL(page: import('@playwright/test').Page) {
       ownerUuid: 'owner-1',
       accessLevel: 'OWNER',
       categories: [{ dimensionKey: 'region', valueKey: 'belgium' }],
+      ...evaluationFields('atom-1'),
       properties: {
         shellies: { uuid: 'atom-1' },
         nuclearies: { title: 'Alpha', description: 'First', content: 'Alpha body', operation: '', constants: {} },
@@ -37,6 +52,7 @@ function mockGraphQL(page: import('@playwright/test').Page) {
       ownerUuid: 'owner-2',
       accessLevel: 'VIEWER',
       categories: [],
+      ...evaluationFields('atom-2'),
       properties: {
         shellies: { uuid: 'atom-2' },
         nuclearies: { title: 'Beta', description: 'Shared read-only', content: 'Beta body', operation: '', constants: {} },
@@ -142,6 +158,9 @@ function mockGraphQL(page: import('@playwright/test').Page) {
 }
 
 async function signIn(page: import('@playwright/test').Page) {
+  // Atoms are selected by clicking them on the Network canvas; the compute default now
+  // lands on Flow (ADR-260065), so prime the relationship emphasis before navigation.
+  await page.addInitScript(() => localStorage.setItem('crystord-home-emphasis', 'relationship'))
   await page.goto('/')
   await expect(page.getByRole('heading', { name: /sign in/i })).toBeVisible()
   const responsePromise = page.waitForResponse((r) =>

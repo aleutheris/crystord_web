@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { WorkspaceShell } from './WorkspaceShell'
@@ -98,37 +98,50 @@ vi.mock('@xyflow/react', () => ({
 }))
 
 describe('WorkspaceShell view switching', () => {
-  it('renders Network view as the default after sign-in', () => {
+  // The initial view derives from the persisted homeEmphasis preference (ADR-260065), so
+  // each test starts from a clean store — the default emphasis is compute → Flow lands.
+  beforeEach(() => {
+    localStorage.clear()
+  })
+
+  it('renders Flow view as the default under the compute home emphasis (ADR-260065)', () => {
+    render(<WorkspaceShell />)
+    expect(screen.getByRole('tab', { name: 'Flow' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByTestId('flow-canvas')).toBeInTheDocument()
+  })
+
+  it('does not render the Network canvas by default', () => {
+    render(<WorkspaceShell />)
+    expect(screen.queryByTestId('network-canvas')).not.toBeInTheDocument()
+  })
+
+  it('renders Network view as the default when home emphasis is relationship', () => {
+    localStorage.setItem('crystord-home-emphasis', 'relationship')
     render(<WorkspaceShell />)
     expect(screen.getByRole('tab', { name: 'Network' })).toHaveAttribute('aria-selected', 'true')
     expect(screen.getByTestId('network-canvas')).toBeInTheDocument()
   })
 
-  it('does not render the Flow canvas by default', () => {
+  it('switches to Network canvas when Network tab is clicked', async () => {
     render(<WorkspaceShell />)
-    expect(screen.queryByTestId('flow-canvas')).not.toBeInTheDocument()
-  })
-
-  it('switches to Flow canvas when Flow tab is clicked', async () => {
-    render(<WorkspaceShell />)
-    await userEvent.click(screen.getByRole('tab', { name: 'Flow' }))
-    expect(screen.getByTestId('flow-canvas')).toBeInTheDocument()
-    expect(screen.queryByTestId('network-canvas')).not.toBeInTheDocument()
-  })
-
-  it('switches back to Network canvas when Network tab is re-clicked', async () => {
-    render(<WorkspaceShell />)
-    await userEvent.click(screen.getByRole('tab', { name: 'Flow' }))
     await userEvent.click(screen.getByRole('tab', { name: 'Network' }))
     expect(screen.getByTestId('network-canvas')).toBeInTheDocument()
     expect(screen.queryByTestId('flow-canvas')).not.toBeInTheDocument()
   })
 
+  it('switches back to Flow canvas when Flow tab is re-clicked', async () => {
+    render(<WorkspaceShell />)
+    await userEvent.click(screen.getByRole('tab', { name: 'Network' }))
+    await userEvent.click(screen.getByRole('tab', { name: 'Flow' }))
+    expect(screen.getByTestId('flow-canvas')).toBeInTheDocument()
+    expect(screen.queryByTestId('network-canvas')).not.toBeInTheDocument()
+  })
+
   it('does not invoke search when switching views', async () => {
     mockSearch.mockClear()
     render(<WorkspaceShell />)
-    await userEvent.click(screen.getByRole('tab', { name: 'Flow' }))
     await userEvent.click(screen.getByRole('tab', { name: 'Network' }))
+    await userEvent.click(screen.getByRole('tab', { name: 'Flow' }))
     expect(mockSearch).not.toHaveBeenCalled()
   })
 
@@ -136,7 +149,7 @@ describe('WorkspaceShell view switching', () => {
     render(<WorkspaceShell />)
     expect(screen.getByText('Crystord')).toBeInTheDocument()
     expect(screen.getByTestId('search-bar')).toBeInTheDocument()
-    await userEvent.click(screen.getByRole('tab', { name: 'Flow' }))
+    await userEvent.click(screen.getByRole('tab', { name: 'Network' }))
     expect(screen.getByText('Crystord')).toBeInTheDocument()
     expect(screen.getByTestId('search-bar')).toBeInTheDocument()
   })

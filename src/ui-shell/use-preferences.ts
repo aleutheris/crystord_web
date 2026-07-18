@@ -14,8 +14,8 @@ export type ComputeBadges = 'always' | 'onDemand'
  * Literal semantics (the contract EPIC-260069 / EPIC-260070 consume):
  * - `homeEmphasis`: `compute` → Flow (compute/dependencies) is the prominent landing;
  *   `relationship` → Network (relationships) is prominent.
- * - `computeBadges`: `always` → status badges on every computed atom; `onDemand` → only when
- *   an atom actually has an operation.
+ * - `computeBadges`: `always` → status badges on every computed atom; `onDemand` → only on
+ *   the currently selected atom (semantics fixed by ADR-260065 / EPIC-260069).
  *
  * Persistence note: like `ThemeProvider`, the value is written to localStorage on first render,
  * so the current default is sticky for a user who never toggles it (a later DEFAULT_* change

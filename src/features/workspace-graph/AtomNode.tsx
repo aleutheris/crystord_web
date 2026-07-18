@@ -1,6 +1,6 @@
 import { Handle, Position } from '@xyflow/react'
 import type { NodeProps } from '@xyflow/react'
-import { C_PRIMARY, C_BORDER, C_SELECTION_BG, C_BG, C_TEXT, C_TEXT_SECONDARY } from '../../styles/tokens'
+import { C_PRIMARY, C_BORDER, C_SELECTION_BG, C_BG, C_TEXT, C_TEXT_SECONDARY, C_SUCCESS, C_ERROR, C_WARNING, C_CARD_BG } from '../../styles/tokens'
 
 /**
  * Flow node data contract (ADR-260061 / EPIC-260066 T7) — the stable, extensible shape the
@@ -65,14 +65,64 @@ export function AtomNode({ data, selected }: NodeProps) {
   )
 }
 
+/** Badge shape stamped by GraphCanvas — mirrors api-contract's ComputeStatus (ADR-260065). */
+interface NodeComputeStatus {
+  kind: 'ok' | 'error' | 'skipped'
+  summary: string
+}
+
+/** Narrowing guard: `computeStatus` arrives untyped through the open AtomNodeData contract. */
+function isComputeStatus(value: unknown): value is NodeComputeStatus {
+  if (typeof value !== 'object' || value === null) return false
+  const record = value as Record<string, unknown>
+  return (
+    (record['kind'] === 'ok' || record['kind'] === 'error' || record['kind'] === 'skipped') &&
+    typeof record['summary'] === 'string'
+  )
+}
+
+const BADGE_STYLES = {
+  ok: { glyph: '✓', text: 'OK', background: C_SUCCESS },
+  error: { glyph: '⚠', text: 'Error', background: C_ERROR },
+  skipped: { glyph: '⏭', text: 'Skipped', background: C_WARNING },
+} as const
+
 /**
- * Badges region (top-right). EPIC-260069 (Compute) renders status badges from
- * `data.computeStatus`; the foundation ships an empty, gated slot — nothing renders until a
- * consumer populates `computeStatus`, so there is no behavior change today.
+ * Badges region (top-right). EPIC-260069 (Compute) renders the status badge from
+ * `data.computeStatus` (stamped by GraphCanvas per the `computeBadges` preference): glyph +
+ * short text on a status-colored tag, with the summary as title/aria-label — never color
+ * alone. The `undefined → null` gate is the reserved seam contract (ADR-260061).
  */
 function NodeBadges({ data }: { data: AtomNodeData }) {
   if (data.computeStatus === undefined) return null
-  return <div data-node-region="badges" style={{ position: 'absolute', top: 2, right: 2 }} />
+  const status = data.computeStatus
+  if (!isComputeStatus(status)) {
+    return <div data-node-region="badges" style={{ position: 'absolute', top: 2, right: 2 }} />
+  }
+  const style = BADGE_STYLES[status.kind]
+  return (
+    <div data-node-region="badges" style={{ position: 'absolute', top: 2, right: 2 }}>
+      <span
+        role="img"
+        title={status.summary}
+        aria-label={status.summary}
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 2,
+          fontSize: '0.6rem',
+          fontWeight: 600,
+          lineHeight: 1,
+          padding: '2px 4px',
+          borderRadius: 6,
+          background: style.background,
+          color: C_CARD_BG,
+        }}
+      >
+        {style.glyph} {style.text}
+      </span>
+    </div>
+  )
 }
 
 /**

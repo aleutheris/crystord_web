@@ -13,7 +13,7 @@ import { GraphRenderGate } from './GraphRenderGate'
 import { GraphLegend } from './GraphLegend'
 import { LeftRail } from './LeftRail'
 import { FacetChips } from './FacetChips'
-import { enabledViews } from './slots'
+import { enabledViews, initialActiveView } from './slots'
 import { WorkspaceProvider, type WorkspaceContextValue } from './workspace-context'
 import { usePreferences } from './use-preferences'
 import { Inspector } from './Inspector'
@@ -29,7 +29,8 @@ export function WorkspaceShell({ googleClientId }: { googleClientId?: string }) 
   const preferences = usePreferences()
   const [selectedAtomId, setSelectedAtomId] = useState<string | null>(null)
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
-  const [activeView, setActiveView] = useState<string>(enabledViews[0]?.id ?? 'flow')
+  // The landing view follows the homeEmphasis preference (ADR-260065 / Q3): compute → Flow.
+  const [activeView, setActiveView] = useState<string>(initialActiveView(preferences.homeEmphasis, enabledViews))
   const { mode: renderMode, confirmRender } = useGraphDegrade(graphData.atoms.length)
   const [isCreatingAtom, setIsCreatingAtom] = useState(false)
   const [creationSuccessMsg, setCreationSuccessMsg] = useState<string | null>(null)
@@ -141,6 +142,7 @@ export function WorkspaceShell({ googleClientId }: { googleClientId?: string }) 
                   onSelectAtom={setSelectedAtomId}
                   onCreateAtom={() => setIsCreatingAtom(true)}
                   renderMode={canvasMode}
+                  computeBadges={preferences.computeBadges}
                 />
               </GraphRenderGate>
             </div>

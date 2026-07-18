@@ -2,6 +2,7 @@ import { MarkerType } from '@xyflow/react'
 import type { Node, Edge } from '@xyflow/react'
 import type { Atom } from '../../api-contract/graph-queries'
 import { atomPermissions } from '../../api-contract/access-control'
+import { C_ERROR } from '../../styles/tokens'
 
 export function atomsToNodes(atoms: Atom[]): Node[] {
   const count = atoms.length
@@ -72,6 +73,30 @@ export function atomsToFlowEdges(atoms: Atom[], eligibleBonds: ReadonlySet<strin
     }
   }
   return edges
+}
+
+/**
+ * Collects every reported cycle edge across the atoms into `from->to` keys
+ * (ADR-260065 / EPIC-260069 — `cycleEdges` rides on each affected atom).
+ */
+export function cycleEdgeKeys(atoms: Atom[]): Set<string> {
+  const keys = new Set<string>()
+  for (const atom of atoms) {
+    for (const pair of atom.cycleEdges ?? []) {
+      keys.add(`${pair.from}->${pair.to}`)
+    }
+  }
+  return keys
+}
+
+/** Danger-styles the flow edges that are part of a reported dependency cycle (ADR-260065). */
+export function applyCycleStyling(edges: Edge[], cycleKeys: ReadonlySet<string>): Edge[] {
+  if (cycleKeys.size === 0) return edges
+  return edges.map((e) =>
+    cycleKeys.has(`${e.source}->${e.target}`)
+      ? { ...e, style: { ...e.style, stroke: C_ERROR, strokeWidth: 2.5 } }
+      : e,
+  )
 }
 
 export function mergeNodePositions(

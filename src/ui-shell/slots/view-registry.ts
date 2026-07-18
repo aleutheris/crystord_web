@@ -23,3 +23,18 @@ export const views: ViewDescriptor[] = [
  * `enabled` is the authoritative gate for view availability.
  */
 export const enabledViews: ViewDescriptor[] = views.filter((v) => v.enabled !== false)
+
+/**
+ * Initial active view derived from the `homeEmphasis` preference (ADR-260065 / Q3):
+ * `compute` → Flow (dependencies prominent), `relationship` → Network — falling back to
+ * the first enabled view when the preferred one is gated off, and to Flow when the
+ * enabled set is empty (unreachable today; Flow is unconditionally registered).
+ */
+export function initialActiveView(
+  homeEmphasis: 'compute' | 'relationship',
+  enabled: readonly { id: string }[],
+): string {
+  const preferred = homeEmphasis === 'relationship' ? 'network' : 'flow'
+  if (enabled.some((v) => v.id === preferred)) return preferred
+  return enabled[0]?.id ?? 'flow'
+}

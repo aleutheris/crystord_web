@@ -1,5 +1,19 @@
 import { test, expect } from '@playwright/test'
 
+// Evaluation-reporting fields selected by RETRIEVE_QUERY since ADR-260065 — mocked on every
+// atom so Apollo logs no missing-field warnings.
+function evaluationFields(uuid: string) {
+  return {
+    evaluationStatus: 'success',
+    errorCode: null,
+    causes: [],
+    cycleNodes: [],
+    cycleEdges: null,
+    originNodeUuid: uuid,
+    affectedNodeUuid: uuid,
+  }
+}
+
 const BASE_ATOMS = [
   {
     labels: ['Project'],
@@ -7,6 +21,7 @@ const BASE_ATOMS = [
     ownerUuid: 'owner-1',
     accessLevel: 'OWNER',
     categories: [],
+    ...evaluationFields('atom-1'),
     properties: {
       shellies: { uuid: 'atom-1' },
       nuclearies: { title: 'Alpha', description: 'First', content: 'Active', operation: '', constants: {} },
@@ -18,6 +33,7 @@ const BASE_ATOMS = [
     ownerUuid: 'owner-1',
     accessLevel: 'OWNER',
     categories: [],
+    ...evaluationFields('atom-2'),
     properties: {
       shellies: { uuid: 'atom-2' },
       nuclearies: { title: 'Beta', description: 'Second', content: 'Pending', operation: '', constants: {} },
@@ -31,6 +47,7 @@ const NEW_ATOM = {
   ownerUuid: 'owner-1',
   accessLevel: 'OWNER',
   categories: [],
+  ...evaluationFields('new-uuid'),
   properties: {
     shellies: { uuid: 'new-uuid' },
     nuclearies: { title: 'Gamma', description: 'New atom', content: '', operation: '', constants: {} },
@@ -97,6 +114,10 @@ function mockGraphQL(
 }
 
 async function signIn(page: import('@playwright/test').Page) {
+  // These scenarios assert new atoms on the Network canvas (and one explicitly clicks the
+  // Flow tab); the compute default now lands on Flow (ADR-260065), so prime the
+  // relationship emphasis before navigation to keep Network the landing view.
+  await page.addInitScript(() => localStorage.setItem('crystord-home-emphasis', 'relationship'))
   await page.goto('/')
   await expect(page.getByRole('heading', { name: /sign in/i })).toBeVisible()
   const responsePromise = page.waitForResponse((r) =>

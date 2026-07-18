@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { atomsToNodes, atomsToEdges, atomsToNetworkEdges, atomsToFlowEdges, mergeNodePositions } from './graph-types'
+import { atomsToNodes, atomsToEdges, atomsToNetworkEdges, atomsToFlowEdges, mergeNodePositions, cycleEdgeKeys, applyCycleStyling } from './graph-types'
 import type { Atom } from '../../api-contract/graph-queries'
 import type { Node } from '@xyflow/react'
 
@@ -170,5 +170,43 @@ describe('mergeNodePositions', () => {
     const merged = mergeNodePositions(next, prev)
 
     expect(merged[0]!.position).toEqual({ x: 50, y: 50 })
+  })
+})
+
+describe('cycleEdgeKeys (ADR-260065 / EPIC-260069)', () => {
+  it('collects from->to keys across all atoms reporting cycle edges', () => {
+    const a1: Atom = { ...makeAtom('a1', 'Alpha'), cycleEdges: [{ from: 'a1', to: 'a2' }] }
+    const a2: Atom = { ...makeAtom('a2', 'Beta'), cycleEdges: [{ from: 'a2', to: 'a1' }, { from: 'a1', to: 'a2' }] }
+    const keys = cycleEdgeKeys([a1, a2, makeAtom('a3', 'Gamma')])
+
+    expect(keys).toEqual(new Set(['a1->a2', 'a2->a1']))
+  })
+
+  it('is empty when no atom reports cycle edges (absent or null field)', () => {
+    const nullish: Atom = { ...makeAtom('a1', 'Alpha'), cycleEdges: null }
+    expect(cycleEdgeKeys([nullish, makeAtom('a2', 'Beta')]).size).toBe(0)
+  })
+})
+
+describe('applyCycleStyling (ADR-260065 / EPIC-260069)', () => {
+  const edges = [
+    { id: 'e1', source: 'a1', target: 'a2' },
+    { id: 'e2', source: 'a2', target: 'a3' },
+  ]
+
+  it('danger-styles exactly the edges on a reported cycle', () => {
+    const styled = applyCycleStyling(edges, new Set(['a1->a2']))
+    expect(styled[0]!.style).toMatchObject({ stroke: 'var(--color-error)', strokeWidth: 2.5 })
+    expect(styled[1]!.style).toBeUndefined()
+  })
+
+  it('preserves existing edge style properties when adding danger styling', () => {
+    const withStyle = [{ id: 'e1', source: 'a1', target: 'a2', style: { opacity: 0.5 } }]
+    const styled = applyCycleStyling(withStyle, new Set(['a1->a2']))
+    expect(styled[0]!.style).toMatchObject({ opacity: 0.5, stroke: 'var(--color-error)' })
+  })
+
+  it('returns the edges untouched when there are no cycles', () => {
+    expect(applyCycleStyling(edges, new Set())).toBe(edges)
   })
 })
