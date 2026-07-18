@@ -29,7 +29,7 @@ function extractImports(filePath: string): string[] {
   return matches.map(m => m[1]!)
 }
 
-const FEATURE_MODULES = ['auth-entry', 'workspace-graph', 'workspace-search', 'workspace-details', 'workspace-table', 'workspace-classify', 'workspace-categories', 'workspace-compute', 'account-settings', 'workspace-admin']
+const FEATURE_MODULES = ['auth-entry', 'workspace-graph', 'workspace-search', 'workspace-details', 'workspace-table', 'workspace-classify', 'workspace-categories', 'workspace-compute', 'workspace-history', 'account-settings', 'workspace-admin']
 
 describe('Architecture boundary checks', () => {
   describe('dependency direction — no cross-feature imports', () => {
@@ -214,6 +214,7 @@ describe('Contract stability — barrel export checks (G5)', () => {
     'workspace-classify': ['ClassifyTab'],
     'workspace-categories': ['CategoriesNavigator'],
     'workspace-compute': ['ComputeTab'],
+    'workspace-history': ['HistoryTab'],
     'account-settings': ['AccountSettingsPanel'],
     'workspace-admin': ['WorkspacePanel'],
   }
@@ -3073,5 +3074,56 @@ describe('Node level-of-detail (ADR-260067 / EPIC-260072)', () => {
   it('classification dots row carries its meaning as text — never color alone', () => {
     const node = fs.readFileSync(path.join(FEATURES, 'workspace-graph', 'AtomNode.tsx'), 'utf-8')
     expect(node).toContain('aria-label="Classification"')
+  })
+})
+
+// --- EPIC-260073: History inspector tab — field-level change audit (ADR-260068 / REQ-FR-260076) ---
+
+describe('History inspector registration and contracts (ADR-260068 / EPIC-260073)', () => {
+  it('inspector registry registers the History tab from the workspace-history barrel, after Compute', () => {
+    const inspectorReg = fs.readFileSync(path.join(SRC, 'ui-shell', 'slots', 'inspector-registry.ts'), 'utf-8')
+    expect(inspectorReg).toContain('HistoryTab')
+    expect(inspectorReg).toMatch(/id:\s*'history'/)
+    expect(inspectorReg).toMatch(/from '\.\.\/\.\.\/features\/workspace-history'/)
+    expect(inspectorReg.indexOf("id: 'history'")).toBeGreaterThan(inspectorReg.indexOf("id: 'compute'"))
+  })
+
+  it('ATOM_CHANGES_QUERY selects the changes page and stays lean (no atom body)', () => {
+    const ops = fs.readFileSync(path.join(SRC, 'api-contract', 'history-operations.ts'), 'utf-8')
+    expect(ops).toContain('changes(limit: $limit, offset: $offset)')
+    expect(ops).not.toContain('nuclearies')
+  })
+
+  it('api-contract barrel exposes the history document and types', () => {
+    const barrel = fs.readFileSync(path.join(SRC, 'api-contract', 'index.ts'), 'utf-8')
+    expect(barrel).toContain('ATOM_CHANGES_QUERY')
+    expect(barrel).toContain('ChangeEvent')
+  })
+
+  it('workspace-history is strictly read-only — no mutation markers anywhere in the feature', () => {
+    for (const file of collectTsFiles(path.join(FEATURES, 'workspace-history'))) {
+      const content = fs.readFileSync(file, 'utf-8')
+      expect(content).not.toContain('useMutation')
+      expect(content).not.toContain('MUTATION')
+      expect(content).not.toContain('createAtom')
+      expect(content).not.toContain('updateAtom')
+      expect(content).not.toContain('deleteAtom')
+    }
+  })
+
+  it('HistoryTab declares a local props slice and imports no ui-shell', () => {
+    const tabPath = path.join(FEATURES, 'workspace-history', 'HistoryTab.tsx')
+    for (const imp of extractImports(tabPath)) {
+      expect(imp).not.toContain('ui-shell')
+    }
+    const tab = fs.readFileSync(tabPath, 'utf-8')
+    expect(tab).toMatch(/interface HistoryTabProps/)
+  })
+
+  it('history E2E spec exists and covers the edit-then-view audit flow', () => {
+    expect(fs.existsSync(path.join(ROOT, 'e2e', 'history.spec.ts'))).toBe(true)
+    const spec = fs.readFileSync(path.join(ROOT, 'e2e', 'history.spec.ts'), 'utf-8')
+    expect(spec).toContain('changes')
+    expect(spec).toContain('Show more')
   })
 })

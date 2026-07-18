@@ -118,6 +118,8 @@ A terminal requirement (`Superseded by <id>` / `Withdrawn`) keeps a tombstone ro
 | REQ-FR-260073 | Compute Formula Builder with Evaluation Transparency | FR | Active | ADR-260065 | EPIC-260069 |
 | REQ-FR-260074 | Account Menu, Workspace Management, and Preferences Surface | FR | Active | ADR-260066 | EPIC-260070 |
 | REQ-FR-260075 | Level-of-Detail Node Rendering in the Flow View | FR | Active | ADR-260067 | EPIC-260072 |
+| REQ-FR-260076 | History Inspector Tab with Field-Level Change Audit | FR | Active | ADR-260068 | EPIC-260073 |
+| REQ-FR-260077 | Share Inspector Tab with Grant and Revoke Flows | FR | Active | ADR-260069 | EPIC-260074 |
 
 ## Superseded
 

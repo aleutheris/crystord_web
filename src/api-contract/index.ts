@@ -133,6 +133,13 @@ export type {
 } from './workspace-operations'
 export { atomPermissions } from './access-control'
 export type { AtomPermissions } from './access-control'
+export { ATOM_CHANGES_QUERY } from './history-operations'
+export type {
+  ChangeEvent,
+  PropertyChange,
+  PropertyChangeMetrics,
+  AtomChangesResponse,
+} from './history-operations'
 export { DISCOVER_OPERATIONS_QUERY } from './compute-operations'
 export type { OperationFunction, DiscoverOperationsResponse } from './compute-operations'
 export { parseOperation, serializeOperation } from './operation-payload'
