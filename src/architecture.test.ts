@@ -29,7 +29,7 @@ function extractImports(filePath: string): string[] {
   return matches.map(m => m[1]!)
 }
 
-const FEATURE_MODULES = ['auth-entry', 'workspace-graph', 'workspace-search', 'workspace-details', 'workspace-table', 'workspace-classify', 'workspace-categories', 'workspace-compute', 'workspace-history', 'workspace-share', 'account-settings', 'workspace-admin']
+const FEATURE_MODULES = ['auth-entry', 'workspace-graph', 'workspace-search', 'workspace-details', 'workspace-table', 'workspace-board', 'workspace-classify', 'workspace-categories', 'workspace-compute', 'workspace-history', 'workspace-share', 'account-settings', 'workspace-admin']
 
 describe('Architecture boundary checks', () => {
   describe('dependency direction — no cross-feature imports', () => {
@@ -211,6 +211,7 @@ describe('Contract stability — barrel export checks (G5)', () => {
     'workspace-search': ['SearchBar', 'QuerySummary', 'SearchResultPanel', 'useSearch', 'SearchState', 'SearchFilters'],
     'workspace-details': ['DetailPanel'],
     'workspace-table': ['TableView'],
+    'workspace-board': ['BoardView'],
     'workspace-classify': ['ClassifyTab'],
     'workspace-categories': ['CategoriesNavigator'],
     'workspace-compute': ['ComputeTab'],
@@ -3181,5 +3182,49 @@ describe('Share inspector registration and contracts (ADR-260069 / EPIC-260074)'
     expect(spec).toContain('shareAtom')
     expect(spec).toContain('revokeAtomAccess')
     expect(spec).toMatch(/VIEWER/)
+  })
+})
+
+// --- EPIC-260075: Board view — kanban bulk classify by dimension (ADR-260070 / REQ-FR-260078) ---
+
+describe('Board view registration and contracts (ADR-260070 / EPIC-260075)', () => {
+  it('view registry registers the Board view from the workspace-board barrel, after Table', () => {
+    const viewReg = fs.readFileSync(path.join(SRC, 'ui-shell', 'slots', 'view-registry.ts'), 'utf-8')
+    expect(viewReg).toContain('BoardView')
+    expect(viewReg).toMatch(/id:\s*'board'/)
+    expect(viewReg).toMatch(/from '\.\.\/\.\.\/features\/workspace-board'/)
+    // Last in display order: the board is the most deferrable leaf, not the landing view.
+    expect(viewReg.indexOf("id: 'board'")).toBeGreaterThan(viewReg.indexOf("id: 'table'"))
+  })
+
+  it('no drag-and-drop library — native HTML5 DnD only (ADR-260070 D4 / REQ-CR-260010)', () => {
+    const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf-8')) as Record<string, Record<string, string>>
+    const allDeps = { ...pkg['dependencies'], ...pkg['devDependencies'] }
+    for (const dep of Object.keys(allDeps)) {
+      expect(dep).not.toMatch(/react-dnd|dnd-kit|react-beautiful-dnd/)
+    }
+  })
+
+  it('the board carries the native drag path AND the accessible move menu + selection cue', () => {
+    // Concatenated over the feature so a refactor may move the markup between its components,
+    // but never drop the drag source, the "Move …" menu (the a11y/E2E path), or aria-current.
+    const feature = collectTsFiles(path.join(FEATURES, 'workspace-board'))
+      .map((f) => fs.readFileSync(f, 'utf-8'))
+      .join('\n')
+    expect(feature).toContain('draggable')
+    expect(feature).toContain('Move ')
+    expect(feature).toContain('aria-current')
+  })
+
+  it('workspace-board imports no ui-shell and no other feature — a local structural props slice', () => {
+    for (const file of collectTsFiles(path.join(FEATURES, 'workspace-board'))) {
+      for (const imp of extractImports(file)) {
+        expect(imp).not.toContain('ui-shell')
+        expect(imp).not.toContain('features/')
+      }
+    }
+    const view = fs.readFileSync(path.join(FEATURES, 'workspace-board', 'BoardView.tsx'), 'utf-8')
+    expect(view).toMatch(/interface BoardData/)
+    expect(view).toMatch(/interface BoardViewProps/)
   })
 })

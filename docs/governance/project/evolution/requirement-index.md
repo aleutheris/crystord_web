@@ -120,6 +120,7 @@ A terminal requirement (`Superseded by <id>` / `Withdrawn`) keeps a tombstone ro
 | REQ-FR-260075 | Level-of-Detail Node Rendering in the Flow View | FR | Active | ADR-260067 | EPIC-260072 |
 | REQ-FR-260076 | History Inspector Tab with Field-Level Change Audit | FR | Active | ADR-260068 | EPIC-260073 |
 | REQ-FR-260077 | Share Inspector Tab with Grant and Revoke Flows | FR | Active | ADR-260069 | EPIC-260074 |
+| REQ-FR-260078 | Board View for Bulk Classification by Dimension | FR | Active | ADR-260070 | EPIC-260075 |
 
 ## Superseded
 
