@@ -9,7 +9,7 @@ vi.mock('./slots', () => ({ navigators: [] }))
 
 const value: WorkspaceContextValue = {
   selection: { selectedAtomId: null, selectedAtom: null, select: vi.fn() },
-  workingSet: { atoms: [] },
+  workingSet: { atoms: [], filter: { labels: [], categories: [] }, onFilterChange: vi.fn() },
   preferences: {
     homeEmphasis: 'compute',
     computeBadges: 'always',

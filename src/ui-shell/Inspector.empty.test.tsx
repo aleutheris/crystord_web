@@ -11,7 +11,7 @@ vi.mock('./slots', () => ({ inspectorTabs: [] }))
 const ATOM = { properties: { shellies: { uuid: 'a1' } } } as unknown as Atom
 const value: WorkspaceContextValue = {
   selection: { selectedAtomId: 'a1', selectedAtom: ATOM, select: vi.fn() },
-  workingSet: { atoms: [ATOM] },
+  workingSet: { atoms: [ATOM], filter: { labels: [], categories: [] }, onFilterChange: vi.fn() },
   preferences: {
     homeEmphasis: 'compute',
     computeBadges: 'always',

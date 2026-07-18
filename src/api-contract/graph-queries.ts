@@ -7,8 +7,8 @@ export const LIST_LABELS_QUERY = gql`
 `
 
 export const RETRIEVE_QUERY = gql`
-  query RetrieveAtoms($labels: [String!], $uuid: String) {
-    retrieve(labels: $labels, uuid: $uuid) {
+  query RetrieveAtoms($labels: [String!], $uuid: String, $categories: [CategoryFilterInput!]) {
+    retrieve(labels: $labels, uuid: $uuid, categories: $categories) {
       labels
       ownerUuid
       accessLevel

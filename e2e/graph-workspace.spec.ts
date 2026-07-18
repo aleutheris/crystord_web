@@ -279,7 +279,8 @@ test.describe('Graph workspace', () => {
     await mockGraphQL(page)
     await signIn(page)
 
-    await page.getByRole('tablist').focus()
+    // Scoped: the left-rail lens switcher (ADR-260064) is a second tablist on the page.
+    await page.getByRole('tablist', { name: 'Graph view' }).focus()
     await page.keyboard.press('ArrowRight')
     await expect(page.getByRole('tab', { name: 'Flow' })).toHaveAttribute('aria-selected', 'true')
     await page.keyboard.press('ArrowLeft')

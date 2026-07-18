@@ -11,6 +11,7 @@ import type {
   DestroyResponse,
   RetrieveResponse,
 } from '../../api-contract/graph-queries'
+import type { CategoryFilter } from '../../api-contract/category-operations'
 import { mapAuthError } from '../../api-contract/error-codes'
 
 function messageOf(err: unknown): string {
@@ -27,7 +28,11 @@ export interface GraphData {
   loading: boolean
   error: string | null
   refetch: () => Promise<void>
-  search: (labels: string[]) => Promise<void>
+  /**
+   * Either argument may be omitted to keep its last committed value (ADR-260064): pass
+   * `undefined` to reuse, `[]` to clear. Existing label-only callers stay valid.
+   */
+  search: (labels?: string[], categories?: CategoryFilter[]) => Promise<void>
   createAtom: (title: string, labels: string[], options?: AtomCreationOptions) => Promise<string | null>
   updateAtom: (uuid: string, atom: Atom) => Promise<void>
   deleteAtom: (uuid: string) => Promise<void>
@@ -41,6 +46,7 @@ export function useGraphData(): GraphData {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const searchLabelsRef = useRef<string[]>([])
+  const searchCategoriesRef = useRef<CategoryFilter[]>([])
 
   // Surface a clear, mapped message for a known auth/access failure (e.g. acting on an atom the caller
   // cannot touch, or an unknown principal) via the central mapper. Stays silent on session expiry — the
@@ -50,17 +56,26 @@ export function useGraphData(): GraphData {
     if (outcome.kind !== 'reauth' && outcome.code) setError(outcome.message)
   }, [])
 
-  const fetchAtoms = useCallback(async (labels?: string[]) => {
+  const fetchAtoms = useCallback(async (labels?: string[], categories?: CategoryFilter[]) => {
     if (labels !== undefined) {
       searchLabelsRef.current = labels
     }
+    if (categories !== undefined) {
+      searchCategoriesRef.current = categories
+    }
     const activeLabels = searchLabelsRef.current
+    const activeCategories = searchCategoriesRef.current
     setLoading(true)
     setError(null)
     try {
       const { data } = await client.query<RetrieveResponse>({
         query: RETRIEVE_QUERY,
-        variables: activeLabels.length > 0 ? { labels: activeLabels } : undefined,
+        variables: activeLabels.length === 0 && activeCategories.length === 0
+          ? undefined
+          : {
+              ...(activeLabels.length > 0 ? { labels: activeLabels } : {}),
+              ...(activeCategories.length > 0 ? { categories: activeCategories } : {}),
+            },
         fetchPolicy: 'network-only',
       })
 

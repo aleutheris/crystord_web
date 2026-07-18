@@ -43,7 +43,7 @@ function provide(
       selectedAtom,
       select: opts.select ?? vi.fn(),
     },
-    workingSet: { atoms: selectedAtom ? [selectedAtom] : [] },
+    workingSet: { atoms: selectedAtom ? [selectedAtom] : [], filter: { labels: [], categories: [] }, onFilterChange: vi.fn() },
     preferences: {
       homeEmphasis: 'compute',
       computeBadges: 'always',

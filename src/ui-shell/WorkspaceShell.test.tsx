@@ -143,7 +143,8 @@ describe('WorkspaceShell view switching', () => {
 
   it('view tabs are visible before any search is submitted', () => {
     render(<WorkspaceShell />)
-    expect(screen.getByRole('tablist')).toBeInTheDocument()
+    // Scoped: the LeftRail lens switcher (ADR-260064) is a second tablist.
+    expect(screen.getByRole('tablist', { name: 'Graph view' })).toBeInTheDocument()
     expect(screen.getByRole('tab', { name: 'Network' })).toBeInTheDocument()
     expect(screen.getByRole('tab', { name: 'Flow' })).toBeInTheDocument()
   })

@@ -96,6 +96,89 @@ describe('useGraphData search', () => {
   })
 })
 
+describe('useGraphData category facets (ADR-260064 / EPIC-260068)', () => {
+  const FACET = { dimensionKey: 'region', valueKeys: ['europe'], includeDescendants: true }
+
+  it('search sends categories alongside labels', async () => {
+    mockQuery.mockResolvedValue(emptyRetrieve)
+    const { result } = renderHook(() => useGraphData())
+
+    await act(() => result.current.search(['Project'], [FACET]))
+
+    expect(mockQuery).toHaveBeenCalledWith(expect.objectContaining({
+      query: RETRIEVE_QUERY,
+      variables: { labels: ['Project'], categories: [FACET] },
+    }))
+  })
+
+  it('a categories-only search omits the labels variable', async () => {
+    mockQuery.mockResolvedValue(emptyRetrieve)
+    const { result } = renderHook(() => useGraphData())
+
+    await act(() => result.current.search([], [FACET]))
+
+    expect(mockQuery).toHaveBeenCalledWith(expect.objectContaining({
+      variables: { categories: [FACET] },
+    }))
+  })
+
+  it('search(undefined, categories) keeps the last committed labels (facet re-fetch)', async () => {
+    mockQuery.mockResolvedValue(emptyRetrieve)
+    const { result } = renderHook(() => useGraphData())
+
+    await act(() => result.current.search(['Project']))
+    await act(() => result.current.search(undefined, [FACET]))
+
+    expect(mockQuery).toHaveBeenLastCalledWith(expect.objectContaining({
+      variables: { labels: ['Project'], categories: [FACET] },
+    }))
+  })
+
+  it('refetch re-uses the last committed categories', async () => {
+    mockQuery.mockResolvedValue(emptyRetrieve)
+    const { result } = renderHook(() => useGraphData())
+
+    await act(() => result.current.search([], [FACET]))
+    mockQuery.mockClear()
+
+    await act(() => result.current.refetch())
+
+    expect(mockQuery).toHaveBeenCalledWith(expect.objectContaining({
+      variables: { categories: [FACET] },
+    }))
+  })
+
+  it('an empty categories array clears the stored facets', async () => {
+    mockQuery.mockResolvedValue(emptyRetrieve)
+    const { result } = renderHook(() => useGraphData())
+
+    await act(() => result.current.search(['Project'], [FACET]))
+    await act(() => result.current.search(undefined, []))
+
+    expect(mockQuery).toHaveBeenLastCalledWith(expect.objectContaining({
+      variables: { labels: ['Project'] },
+    }))
+  })
+
+  it('clearing both labels and categories sends undefined variables', async () => {
+    mockQuery.mockResolvedValue(emptyRetrieve)
+    const { result } = renderHook(() => useGraphData())
+
+    await act(() => result.current.search(['Project'], [FACET]))
+    await act(() => result.current.search([], []))
+
+    expect(mockQuery).toHaveBeenLastCalledWith(expect.objectContaining({
+      variables: undefined,
+    }))
+  })
+
+  it('RETRIEVE_QUERY declares the $categories CategoryFilterInput variable', () => {
+    const printed = RETRIEVE_QUERY.loc?.source.body ?? ''
+    expect(printed).toContain('$categories: [CategoryFilterInput!]')
+    expect(printed).toContain('categories: $categories')
+  })
+})
+
 describe('useGraphData bond mutations', () => {
   it('addBond strips __typename from nuclearies mutation input', async () => {
     const atom = {

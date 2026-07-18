@@ -1,6 +1,7 @@
 import type { ComponentType } from 'react'
 import type { Atom } from '../../api-contract'
 import type { GraphData } from '../../features/workspace-graph'
+import type { WorkspaceFilter } from '../../ui-primitives'
 
 /**
  * Application-shell slot contracts (ADR-260061 / EPIC-260066).
@@ -49,13 +50,15 @@ export interface InspectorTabDescriptor {
 
 /**
  * Props every left-rail navigator receives. Navigators are *scoping* surfaces — they browse
- * the index (labels, categories) and narrow the working set — **not** atom pickers. The
- * contract is intentionally minimal for now; a scope/filter affordance is added once the shared
- * filter builder defines the filter shape (EPIC-260066 T8 / EPIC-260068). Server-structure
- * navigators (Categories) fetch via api-contract rather than reading `atoms`.
+ * the index (labels, categories) and narrow the working set — **not** atom pickers.
+ * Server-structure navigators (Categories) fetch via api-contract rather than reading `atoms`.
+ * The filter contract deferred by EPIC-260066 is the additive optional pair below
+ * (ADR-260064): the shell owns the filter; a navigator proposes changes through the callback.
  */
 export interface NavigatorProps {
   atoms: Atom[]
+  filter?: WorkspaceFilter
+  onFilterChange?: (filter: WorkspaceFilter) => void
 }
 
 /** A left-rail navigator lens (Labels, Categories, …). */

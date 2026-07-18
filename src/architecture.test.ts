@@ -29,7 +29,7 @@ function extractImports(filePath: string): string[] {
   return matches.map(m => m[1]!)
 }
 
-const FEATURE_MODULES = ['auth-entry', 'workspace-graph', 'workspace-search', 'workspace-details', 'workspace-table', 'workspace-classify', 'account-settings']
+const FEATURE_MODULES = ['auth-entry', 'workspace-graph', 'workspace-search', 'workspace-details', 'workspace-table', 'workspace-classify', 'workspace-categories', 'account-settings']
 
 describe('Architecture boundary checks', () => {
   describe('dependency direction — no cross-feature imports', () => {
@@ -212,6 +212,7 @@ describe('Contract stability — barrel export checks (G5)', () => {
     'workspace-details': ['DetailPanel'],
     'workspace-table': ['TableView'],
     'workspace-classify': ['ClassifyTab'],
+    'workspace-categories': ['CategoriesNavigator'],
     'account-settings': ['AccountSettingsPanel'],
   }
 
@@ -2863,5 +2864,43 @@ describe('Classify inspector registration and contracts (ADR-260063 / EPIC-26006
     expect(tab).toMatch(/aria-label="Labels"/)
     const section = fs.readFileSync(path.join(FEATURES, 'workspace-classify', 'CategoriesSection.tsx'), 'utf-8')
     expect(section).toMatch(/aria-label="Categories"/)
+  })
+})
+
+// --- EPIC-260068: Categories navigator — facet tree, lens switcher, inline authoring (ADR-260064 / REQ-FR-260072) ---
+
+describe('Categories navigator registration and contracts (ADR-260064 / EPIC-260068)', () => {
+  it('navigator registry registers CategoriesNavigator from the workspace-categories barrel, after labels', () => {
+    const reg = fs.readFileSync(path.join(SRC, 'ui-shell', 'slots', 'navigator-registry.ts'), 'utf-8')
+    expect(reg).toContain('CategoriesNavigator')
+    expect(reg).toMatch(/id:\s*'categories'/)
+    expect(reg).toMatch(/from '\.\.\/\.\.\/features\/workspace-categories'/)
+    expect(reg.indexOf("id: 'categories'")).toBeGreaterThan(reg.indexOf("id: 'labels'"))
+  })
+
+  it('NavigatorProps carries the additive optional filter contract', () => {
+    const types = fs.readFileSync(path.join(SRC, 'ui-shell', 'slots', 'slot-types.ts'), 'utf-8')
+    expect(types).toContain('filter?')
+    expect(types).toContain('onFilterChange?')
+  })
+
+  it('RETRIEVE_QUERY accepts the optional category facet filter', () => {
+    const queries = fs.readFileSync(path.join(SRC, 'api-contract', 'graph-queries.ts'), 'utf-8')
+    expect(queries).toContain('$categories')
+    expect(queries).toContain('CategoryFilterInput')
+  })
+
+  it('LeftRail hosts the registry-driven lens switcher (ARIA tablist)', () => {
+    const rail = fs.readFileSync(path.join(SRC, 'ui-shell', 'LeftRail.tsx'), 'utf-8')
+    expect(rail).toMatch(/role="tablist"/)
+    expect(rail).toContain('Navigator lens')
+    expect(rail).toContain('ArrowRight')
+    expect(rail).toContain('ArrowLeft')
+  })
+
+  it('WorkspaceShell owns the category facet state', () => {
+    const shell = fs.readFileSync(path.join(SRC, 'ui-shell', 'WorkspaceShell.tsx'), 'utf-8')
+    expect(shell).toContain('categoryFacets')
+    expect(shell).toContain('FacetChips')
   })
 })

@@ -1,5 +1,6 @@
 import { createContext, useContext, type ReactNode } from 'react'
 import type { Atom } from '../api-contract'
+import type { WorkspaceFilter } from '../ui-primitives'
 import type { WorkspacePreferences } from './use-preferences'
 
 /**
@@ -19,6 +20,13 @@ export interface WorkspaceSelection {
 
 export interface WorkspaceWorkingSet {
   atoms: Atom[]
+  /**
+   * The active working-set scope (ADR-260064). `filter.labels` mirrors submitted label search
+   * only where cheaply available (the shell exposes `[]` — labels live inside useSearch);
+   * `filter.categories` is the shell-owned facet state.
+   */
+  filter: WorkspaceFilter
+  onFilterChange: (filter: WorkspaceFilter) => void
 }
 
 export interface WorkspaceContextValue {

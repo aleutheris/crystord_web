@@ -72,6 +72,13 @@ export type {
 export {
   RETRIEVE_CATEGORY_DIMENSIONS_QUERY,
   RETRIEVE_CATEGORY_VALUES_QUERY,
+  RETRIEVE_CATEGORY_BROWSE_QUERY,
+  CREATE_CATEGORY_DIMENSION_MUTATION,
+  CREATE_CATEGORY_VALUE_MUTATION,
+  UPDATE_CATEGORY_DIMENSION_MUTATION,
+  UPDATE_CATEGORY_VALUE_MUTATION,
+  DELETE_CATEGORY_DIMENSION_MUTATION,
+  DELETE_CATEGORY_VALUE_MUTATION,
 } from './category-operations'
 export type {
   CategoryDimension,
@@ -80,6 +87,18 @@ export type {
   CategoryValueSelector,
   RetrieveCategoryDimensionsResponse,
   RetrieveCategoryValuesResponse,
+  CategoryBrowseValue,
+  CategoryBrowseChild,
+  CategoryBrowseOutput,
+  RetrieveCategoryBrowseVariables,
+  RetrieveCategoryBrowseResponse,
+  CategoryFilter,
+  CreateCategoryDimensionResponse,
+  CreateCategoryValueResponse,
+  UpdateCategoryDimensionResponse,
+  UpdateCategoryValueResponse,
+  DeleteCategoryDimensionResponse,
+  DeleteCategoryValueResponse,
 } from './category-operations'
 export { atomPermissions } from './access-control'
 export type { AtomPermissions } from './access-control'
