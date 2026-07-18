@@ -1,0 +1,1 @@
+export { ShareTab } from './ShareTab'

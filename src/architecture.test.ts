@@ -29,7 +29,7 @@ function extractImports(filePath: string): string[] {
   return matches.map(m => m[1]!)
 }
 
-const FEATURE_MODULES = ['auth-entry', 'workspace-graph', 'workspace-search', 'workspace-details', 'workspace-table', 'workspace-classify', 'workspace-categories', 'workspace-compute', 'workspace-history', 'account-settings', 'workspace-admin']
+const FEATURE_MODULES = ['auth-entry', 'workspace-graph', 'workspace-search', 'workspace-details', 'workspace-table', 'workspace-classify', 'workspace-categories', 'workspace-compute', 'workspace-history', 'workspace-share', 'account-settings', 'workspace-admin']
 
 describe('Architecture boundary checks', () => {
   describe('dependency direction — no cross-feature imports', () => {
@@ -215,6 +215,7 @@ describe('Contract stability — barrel export checks (G5)', () => {
     'workspace-categories': ['CategoriesNavigator'],
     'workspace-compute': ['ComputeTab'],
     'workspace-history': ['HistoryTab'],
+    'workspace-share': ['ShareTab'],
     'account-settings': ['AccountSettingsPanel'],
     'workspace-admin': ['WorkspacePanel'],
   }
@@ -3125,5 +3126,60 @@ describe('History inspector registration and contracts (ADR-260068 / EPIC-260073
     const spec = fs.readFileSync(path.join(ROOT, 'e2e', 'history.spec.ts'), 'utf-8')
     expect(spec).toContain('changes')
     expect(spec).toContain('Show more')
+  })
+})
+
+// --- EPIC-260074: Share inspector tab — atom-level access grants (ADR-260069 / REQ-FR-260077) ---
+
+describe('Share inspector registration and contracts (ADR-260069 / EPIC-260074)', () => {
+  it('inspector registry registers the Share tab from the workspace-share barrel, after History', () => {
+    const inspectorReg = fs.readFileSync(path.join(SRC, 'ui-shell', 'slots', 'inspector-registry.ts'), 'utf-8')
+    expect(inspectorReg).toContain('ShareTab')
+    expect(inspectorReg).toMatch(/id:\s*'share'/)
+    expect(inspectorReg).toMatch(/from '\.\.\/\.\.\/features\/workspace-share'/)
+    expect(inspectorReg.indexOf("id: 'share'")).toBeGreaterThan(inspectorReg.indexOf("id: 'history'"))
+  })
+
+  it('the Share tab is owner-gated via the when predicate (every sharing op is owner-only)', () => {
+    const inspectorReg = fs.readFileSync(path.join(SRC, 'ui-shell', 'slots', 'inspector-registry.ts'), 'utf-8')
+    expect(inspectorReg).toMatch(/when:\s*\(atom\)\s*=>\s*atom\.accessLevel === 'OWNER'/)
+  })
+
+  it('api-contract barrel exposes the sharing documents and types', () => {
+    const barrel = fs.readFileSync(path.join(SRC, 'api-contract', 'index.ts'), 'utf-8')
+    expect(barrel).toContain('LIST_ATOM_GRANTS_QUERY')
+    expect(barrel).toContain('SHARE_ATOM_MUTATION')
+    expect(barrel).toContain('REVOKE_ATOM_ACCESS_MUTATION')
+    expect(barrel).toContain('AtomGrant')
+    // The grantable level type keeps its name distinct from EffectiveAccessLevel.
+    expect(barrel).toContain('GrantableAccessLevel')
+  })
+
+  it('workspace-share imports no ui-shell — the tab declares a local props slice', () => {
+    for (const file of collectTsFiles(path.join(FEATURES, 'workspace-share'))) {
+      for (const imp of extractImports(file)) {
+        expect(imp).not.toContain('ui-shell')
+      }
+    }
+    const tab = fs.readFileSync(path.join(FEATURES, 'workspace-share', 'ShareTab.tsx'), 'utf-8')
+    expect(tab).toMatch(/interface ShareTabProps/)
+  })
+
+  it('GrantList and GrantForm stay presentational — no apollo or api-contract imports (ADR-260069 reuse seam)', () => {
+    for (const f of ['GrantList.tsx', 'GrantForm.tsx']) {
+      for (const imp of extractImports(path.join(FEATURES, 'workspace-share', f))) {
+        expect(imp).not.toContain('apollo')
+        expect(imp).not.toContain('api-contract')
+      }
+    }
+  })
+
+  it('share E2E spec exists and covers grant, revoke, and the non-owner gate', () => {
+    expect(fs.existsSync(path.join(ROOT, 'e2e', 'share.spec.ts'))).toBe(true)
+    const spec = fs.readFileSync(path.join(ROOT, 'e2e', 'share.spec.ts'), 'utf-8')
+    expect(spec).toContain('listAtomGrants')
+    expect(spec).toContain('shareAtom')
+    expect(spec).toContain('revokeAtomAccess')
+    expect(spec).toMatch(/VIEWER/)
   })
 })

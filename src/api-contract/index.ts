@@ -140,6 +140,22 @@ export type {
   PropertyChangeMetrics,
   AtomChangesResponse,
 } from './history-operations'
+export {
+  LIST_ATOM_GRANTS_QUERY,
+  SHARE_ATOM_MUTATION,
+  REVOKE_ATOM_ACCESS_MUTATION,
+} from './sharing-operations'
+export type {
+  PrincipalType,
+  GrantableAccessLevel,
+  AtomGrant,
+  ListAtomGrantsVariables,
+  ListAtomGrantsResponse,
+  ShareAtomVariables,
+  ShareAtomResponse,
+  RevokeAtomAccessVariables,
+  RevokeAtomAccessResponse,
+} from './sharing-operations'
 export { DISCOVER_OPERATIONS_QUERY } from './compute-operations'
 export type { OperationFunction, DiscoverOperationsResponse } from './compute-operations'
 export { parseOperation, serializeOperation } from './operation-payload'
