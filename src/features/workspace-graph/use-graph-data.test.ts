@@ -437,3 +437,65 @@ describe('useGraphData access-error handling (BI-260061 / REQ-FR-260069)', () =>
     expect(result.current.error).toMatch(/don't have access/i)
   })
 })
+
+describe('useGraphData createAtom error contract', () => {
+  it('rethrows a failed creation instead of leaving an unhandled rejection', async () => {
+    // Regression: createAtom used to await the mutation bare, so a server rejection escaped as an
+    // uncaught promise and the Create button looked inert.
+    mockMutate.mockRejectedValue(new Error("Invalid input 'n': expected 'FOREACH'"))
+    const { result } = renderHook(() => useGraphData())
+
+    await act(async () => {
+      await expect(result.current.createAtom('T', ['Tag'])).rejects.toThrow(/Invalid input/)
+    })
+  })
+
+  it('surfaces a mapped access error when creation is rejected', async () => {
+    mockMutate.mockRejectedValue(new Error('AU-UNAUTHORIZED'))
+    const { result } = renderHook(() => useGraphData())
+
+    await act(async () => {
+      await expect(result.current.createAtom('T', ['Tag'])).rejects.toThrow()
+    })
+    expect(result.current.error).toMatch(/don't have access/i)
+  })
+
+  it('stays silent on session expiry, leaving global sign-out to handle it', async () => {
+    mockMutate.mockRejectedValue(new Error('AUTHZ-AUTHENTICATION-REQUIRED'))
+    const { result } = renderHook(() => useGraphData())
+
+    await act(async () => {
+      await expect(result.current.createAtom('T', ['Tag'])).rejects.toThrow()
+    })
+    expect(result.current.error).toBeNull()
+  })
+})
+
+describe('useGraphData createAtom success path', () => {
+  it('returns the new atom id and refetches', async () => {
+    mockMutate.mockResolvedValue({ data: { change: ['new-uuid'] } })
+    mockQuery.mockResolvedValue(emptyRetrieve)
+    const { result } = renderHook(() => useGraphData())
+
+    let created: string | null = null
+    await act(async () => {
+      created = await result.current.createAtom('T', ['Tag'])
+    })
+
+    expect(created).toBe('new-uuid')
+    expect(mockQuery).toHaveBeenCalled()
+  })
+
+  it('returns null when the mutation reports no created id', async () => {
+    mockMutate.mockResolvedValue({ data: {} })
+    mockQuery.mockResolvedValue(emptyRetrieve)
+    const { result } = renderHook(() => useGraphData())
+
+    let created: string | null = 'unset'
+    await act(async () => {
+      created = await result.current.createAtom('T', ['Tag'])
+    })
+
+    expect(created).toBeNull()
+  })
+})

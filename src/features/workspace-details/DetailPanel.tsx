@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { FormEvent } from 'react'
 import type { Atom } from '../../api-contract/graph-queries'
 import { atomPermissions } from '../../api-contract/access-control'
+import { mapAuthError } from '../../api-contract/error-codes'
 import { LabelChipEditor } from '../../ui-primitives'
 import { C_BORDER, C_CARD_BG, C_ERROR, C_TEXT_MUTED } from '../../styles/tokens'
 
@@ -22,7 +23,19 @@ export function DetailPanel({ atom, isCreationMode, onCreate, onUpdate, onDelete
   // Creation-mode only: `change` requires labels at creation, so creation keeps a chip editor.
   // Edit-mode label editing moved to the Classify inspector tab (ADR-260063 / EPIC-260067).
   const [labels, setLabels] = useState<string[]>([])
+  // Uncommitted chip-editor text. A chip only exists after Enter, so without this a user who typed
+  // a label and clicked Create saw a filled-in form and a dead button.
+  const [labelDraft, setLabelDraft] = useState('')
   const [saving, setSaving] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
+
+  // What creation would actually send: committed chips plus any typed-but-uncommitted text.
+  const pendingLabel = labelDraft.trim()
+  const effectiveLabels = pendingLabel && !labels.includes(pendingLabel) ? [...labels, pendingLabel] : labels
+
+  // `change` requires at least one label at creation; submitting with none produced an invalid
+  // `SET n:` clause server-side and failed silently.
+  const labelsMissing = Boolean(isCreationMode) && effectiveLabels.length === 0
 
   // Read-side affordance gating (BI-260061 / REQ-FR-260069). Creation is always editable (you own the
   // new atom); for an existing atom, gate on the caller's access level (missing → read-only).
@@ -36,11 +49,12 @@ export function DetailPanel({ atom, isCreationMode, onCreate, onUpdate, onDelete
 
   async function handleSave(e: FormEvent) {
     e.preventDefault()
-    if (!canEdit) return
+    if (!canEdit || labelsMissing) return
     setSaving(true)
+    setSubmitError(null)
     try {
       if (isCreationMode && onCreate) {
-        await onCreate(title, labels, description, content)
+        await onCreate(title, effectiveLabels, description, content)
       } else if (atom && onUpdate) {
         // Labels are untouched here (the spread keeps `atom.labels`) — Classify owns them.
         const updated: Atom = {
@@ -52,6 +66,12 @@ export function DetailPanel({ atom, isCreationMode, onCreate, onUpdate, onDelete
         }
         await onUpdate(uuid, updated)
       }
+    } catch (err) {
+      // Report inline, not through the hook's global `error`: the creation overlay sits above the
+      // canvas, so a canvas-level error would render behind it. Same local-notice split TableView
+      // uses for `saveError`. Message goes through the central mapper (REQ-CR-260025) rather than
+      // rendering a raw server string.
+      setSubmitError(mapAuthError(err instanceof Error ? err.message : String(err)).message)
     } finally {
       setSaving(false)
     }
@@ -99,7 +119,13 @@ export function DetailPanel({ atom, isCreationMode, onCreate, onUpdate, onDelete
               labels={labels}
               onAdd={(label) => setLabels((prev) => [...prev, label])}
               onRemove={(label) => setLabels((prev) => prev.filter((l) => l !== label))}
+              onDraftChange={setLabelDraft}
             />
+            {labelsMissing && (
+              <p role="status" style={{ margin: '0.2rem 0 0', fontSize: '0.72rem', color: C_TEXT_MUTED }}>
+                Add at least one label — an atom needs one to be created.
+              </p>
+            )}
           </div>
         )}
         <div>
@@ -116,9 +142,15 @@ export function DetailPanel({ atom, isCreationMode, onCreate, onUpdate, onDelete
           )}
         </div>
 
+        {submitError && (
+          <p role="alert" style={{ margin: 0, fontSize: '0.78rem', color: C_ERROR }}>
+            {submitError}
+          </p>
+        )}
+
         <div style={{ display: 'flex', gap: '0.5rem', marginTop: 'auto' }}>
           {canEdit && (
-            <button type="submit" disabled={saving} style={{ padding: '0.4rem 1rem' }}>
+            <button type="submit" disabled={saving || labelsMissing} style={{ padding: '0.4rem 1rem' }}>
               {saving ? (isCreationMode ? 'Creating…' : 'Saving…') : (isCreationMode ? 'Create' : 'Save')}
             </button>
           )}

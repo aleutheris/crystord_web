@@ -58,3 +58,40 @@ describe('LabelChipEditor', () => {
     expect(container.querySelector('datalist option[value="Alpha"]')).not.toBeNull()
   })
 })
+
+describe('LabelChipEditor draft reporting', () => {
+  it('reports uncommitted input text to the caller', async () => {
+    const onDraftChange = vi.fn()
+    const user = userEvent.setup()
+    render(
+      <LabelChipEditor labels={[]} onAdd={vi.fn()} onRemove={vi.fn()} onDraftChange={onDraftChange} />,
+    )
+
+    await user.type(screen.getByLabelText('Add label'), 'Pro')
+
+    expect(onDraftChange).toHaveBeenLastCalledWith('Pro')
+  })
+
+  it('clears the reported draft once the chip is committed', async () => {
+    const onDraftChange = vi.fn()
+    const onAdd = vi.fn()
+    const user = userEvent.setup()
+    render(
+      <LabelChipEditor labels={[]} onAdd={onAdd} onRemove={vi.fn()} onDraftChange={onDraftChange} />,
+    )
+
+    await user.type(screen.getByLabelText('Add label'), 'Project{Enter}')
+
+    expect(onAdd).toHaveBeenCalledWith('Project')
+    expect(onDraftChange).toHaveBeenLastCalledWith('')
+  })
+
+  it('works without the optional callback', async () => {
+    const user = userEvent.setup()
+    render(<LabelChipEditor labels={[]} onAdd={vi.fn()} onRemove={vi.fn()} />)
+
+    await user.type(screen.getByLabelText('Add label'), 'Project')
+
+    expect(screen.getByLabelText('Add label')).toHaveValue('Project')
+  })
+})

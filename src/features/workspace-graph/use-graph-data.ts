@@ -93,21 +93,29 @@ export function useGraphData(): GraphData {
   }, [client])
 
   const createAtom = useCallback(async (title: string, labels: string[], options?: AtomCreationOptions): Promise<string | null> => {
-    const result = await client.mutate({
-      mutation: CREATE_ATOMS_MUTATION,
-      variables: {
-        inputs: [{
-          labels,
-          properties: {
-            nuclearies: { title, description: options?.description ?? '', content: options?.content ?? '', operation: '', constants: {} },
-          },
-        }],
-      },
-    })
-    const ids = (result.data as Record<string, unknown>)?.change as string[] | undefined
-    await fetchAtoms()
-    return ids?.[0] ?? null
-  }, [client, fetchAtoms])
+    try {
+      const result = await client.mutate({
+        mutation: CREATE_ATOMS_MUTATION,
+        variables: {
+          inputs: [{
+            labels,
+            properties: {
+              nuclearies: { title, description: options?.description ?? '', content: options?.content ?? '', operation: '', constants: {} },
+            },
+          }],
+        },
+      })
+      const ids = (result.data as Record<string, unknown>)?.change as string[] | undefined
+      await fetchAtoms()
+      return ids?.[0] ?? null
+    } catch (err) {
+      // Matches updateAtom/deleteAtom: map known auth codes to the global banner, then rethrow so
+      // the caller can react. Without this the rejection escaped as an unhandled promise and the
+      // Create button looked inert.
+      surfaceAuthError(err)
+      throw err
+    }
+  }, [client, fetchAtoms, surfaceAuthError])
 
   const toNucleariesInput = useCallback((nuclearies: Atom['properties']['nuclearies']) => ({
     title: nuclearies.title,

@@ -17,13 +17,19 @@ export function LabelChipEditor({
   ariaLabel = 'Labels',
   classNames,
   chipStyle,
+  onDraftChange,
 }: LabelChipEditorProps) {
   const [draft, setDraft] = useState('')
+
+  function updateDraft(value: string) {
+    setDraft(value)
+    onDraftChange?.(value)
+  }
 
   function commit() {
     const value = draft.trim()
     if (value && !labels.includes(value)) onAdd(value)
-    setDraft('')
+    updateDraft('')
   }
 
   return (
@@ -47,7 +53,7 @@ export function LabelChipEditor({
         list={suggestions.length > 0 ? SUGGESTIONS_LIST_ID : undefined}
         value={draft}
         placeholder={placeholder}
-        onChange={(e) => setDraft(e.target.value)}
+        onChange={(e) => updateDraft(e.target.value)}
         onKeyDown={(e) => {
           if (e.key === 'Enter') {
             e.preventDefault()

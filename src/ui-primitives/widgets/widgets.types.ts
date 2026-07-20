@@ -50,6 +50,14 @@ export interface LabelChipEditorProps {
    * label palette) without the widget knowing about color policy. Merged over classNames styling.
    */
   chipStyle?: (label: string) => CSSProperties | undefined
+  /**
+   * Notifies the caller of uncommitted input text. A chip only exists once the user presses Enter,
+   * so a form that gates submission on `labels` would otherwise reject a field the user has
+   * visibly filled in. Callers that need submit-time validation (atom creation) track this;
+   * callers that persist per-chip (Classify) ignore it, since committing a draft they never
+   * confirmed would write an unintended label to the server.
+   */
+  onDraftChange?: (draft: string) => void
 }
 
 export interface CategoryTreeClassNames {

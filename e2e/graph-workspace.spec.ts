@@ -1,4 +1,5 @@
-import { test, expect } from '@playwright/test'
+import { test, expect } from './fixtures'
+import { unmockedOperation } from './graphql-mock'
 
 // Evaluation-reporting fields selected by RETRIEVE_QUERY since ADR-260065 — mocked on every
 // atom so Apollo logs no missing-field warnings.
@@ -44,26 +45,10 @@ function mockGraphQL(page: import('@playwright/test').Page) {
 
   return page.route('**/{api,graphql}', (route) => {
     const postData = route.request().postData()
-    if (!postData) return route.continue()
+    if (!postData) return route.fallback()
 
     const body = JSON.parse(postData)
     const query: string = body.query ?? ''
-
-    if (query.includes('schemaInfo')) {
-      return route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          data: {
-            schemaInfo: {
-              schemaVersion: '9.2.0',
-              schemaHash: '6e1c4572d4a6d485702dc8a3c46491d51b8fc1fb34c032474f4e54e8a4ba01b8',
-              releasedAt: '2026-05-27T00:00:00Z',
-            },
-          },
-        }),
-      })
-    }
 
     if (query.includes('signin')) {
       return route.fulfill({
@@ -105,7 +90,15 @@ function mockGraphQL(page: import('@playwright/test').Page) {
       })
     }
 
-    return route.continue()
+    if (query.includes('logout')) {
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { logout: true } }),
+      })
+    }
+
+    return unmockedOperation(page, route, query)
   })
 }
 
@@ -335,25 +328,10 @@ test.describe('Graph workspace', () => {
     // Override mock to fail on mutations
     await page.route('**/{api,graphql}', (route) => {
       const postData = route.request().postData()
-      if (!postData) return route.continue()
+      if (!postData) return route.fallback()
       const body = JSON.parse(postData)
       const query: string = body.query ?? ''
 
-      if (query.includes('schemaInfo')) {
-        return route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({
-            data: {
-              schemaInfo: {
-                schemaVersion: '9.2.0',
-                schemaHash: '6e1c4572d4a6d485702dc8a3c46491d51b8fc1fb34c032474f4e54e8a4ba01b8',
-                releasedAt: '2026-05-27T00:00:00Z',
-              },
-            },
-          }),
-        })
-      }
       if (query.includes('signin')) {
         return route.fulfill({
           status: 200,
@@ -400,7 +378,7 @@ test.describe('Graph workspace', () => {
           body: JSON.stringify({ data: null, errors: [{ message: 'Server error' }] }),
         })
       }
-      return route.continue()
+      return unmockedOperation(page, route, query)
     })
 
     await primeRelationshipEmphasis(page)

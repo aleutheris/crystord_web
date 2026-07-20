@@ -268,9 +268,193 @@ describe('DetailPanel — creation mode', () => {
     )
 
     await user.type(screen.getByLabelText(/title/i), 'Test')
+    await user.type(screen.getByLabelText('Add label'), 'Tag1{Enter}')
     await user.click(screen.getByRole('button', { name: /^create$/i }))
 
     expect(screen.getByRole('button', { name: /creating/i })).toBeDisabled()
     resolveCreate()
+  })
+})
+
+describe('DetailPanel — creation requires a label', () => {
+  it('disables Create until a label chip exists', async () => {
+    const user = userEvent.setup()
+    render(<DetailPanel isCreationMode={true} onCreate={vi.fn()} onClose={vi.fn()} />)
+
+    await user.type(screen.getByLabelText(/title/i), 'New Node')
+    expect(screen.getByRole('button', { name: /^create$/i })).toBeDisabled()
+
+    await user.type(screen.getByLabelText('Add label'), 'Tag1{Enter}')
+    expect(screen.getByRole('button', { name: /^create$/i })).toBeEnabled()
+  })
+
+  it('re-disables Create when the last label is removed', async () => {
+    const user = userEvent.setup()
+    render(<DetailPanel isCreationMode={true} onCreate={vi.fn()} onClose={vi.fn()} />)
+
+    await user.type(screen.getByLabelText('Add label'), 'Tag1{Enter}')
+    await user.click(screen.getByRole('button', { name: 'Remove Tag1' }))
+
+    expect(screen.getByRole('button', { name: /^create$/i })).toBeDisabled()
+  })
+
+  it('explains why Create is unavailable while no label is set', async () => {
+    const user = userEvent.setup()
+    render(<DetailPanel isCreationMode={true} onCreate={vi.fn()} onClose={vi.fn()} />)
+
+    expect(screen.getByText(/add at least one label/i)).toBeInTheDocument()
+
+    await user.type(screen.getByLabelText('Add label'), 'Tag1{Enter}')
+    expect(screen.queryByText(/add at least one label/i)).not.toBeInTheDocument()
+  })
+
+  it('never submits a label-less atom, so the invalid-Cypher request is not sent', async () => {
+    const onCreate = vi.fn()
+    const user = userEvent.setup()
+    render(<DetailPanel isCreationMode={true} onCreate={onCreate} onClose={vi.fn()} />)
+
+    await user.type(screen.getByLabelText(/title/i), 'New Node{Enter}')
+
+    expect(onCreate).not.toHaveBeenCalled()
+  })
+
+  it('accepts a typed label that was never committed with Enter', async () => {
+    // The reported bug: every field looks filled, but a chip only exists after Enter, so Create
+    // stayed disabled and the form appeared broken.
+    const onCreate = vi.fn().mockResolvedValue(undefined)
+    const user = userEvent.setup()
+    render(<DetailPanel isCreationMode={true} onCreate={onCreate} onClose={vi.fn()} />)
+
+    await user.type(screen.getByLabelText(/title/i), 'New Node')
+    await user.type(screen.getByLabelText('Add label'), 'Project')
+
+    expect(screen.getByRole('button', { name: /^create$/i })).toBeEnabled()
+    await user.click(screen.getByRole('button', { name: /^create$/i }))
+
+    expect(onCreate).toHaveBeenCalledWith('New Node', ['Project'], '', '')
+  })
+
+  it('sends committed chips together with a still-typed label', async () => {
+    const onCreate = vi.fn().mockResolvedValue(undefined)
+    const user = userEvent.setup()
+    render(<DetailPanel isCreationMode={true} onCreate={onCreate} onClose={vi.fn()} />)
+
+    await user.type(screen.getByLabelText(/title/i), 'New Node')
+    await user.type(screen.getByLabelText('Add label'), 'Alpha{Enter}Beta')
+    await user.click(screen.getByRole('button', { name: /^create$/i }))
+
+    expect(onCreate).toHaveBeenCalledWith('New Node', ['Alpha', 'Beta'], '', '')
+  })
+
+  it('does not count a duplicate typed label twice', async () => {
+    const onCreate = vi.fn().mockResolvedValue(undefined)
+    const user = userEvent.setup()
+    render(<DetailPanel isCreationMode={true} onCreate={onCreate} onClose={vi.fn()} />)
+
+    await user.type(screen.getByLabelText(/title/i), 'New Node')
+    await user.type(screen.getByLabelText('Add label'), 'Alpha{Enter}Alpha')
+    await user.click(screen.getByRole('button', { name: /^create$/i }))
+
+    expect(onCreate).toHaveBeenCalledWith('New Node', ['Alpha'], '', '')
+  })
+
+  it('treats whitespace-only label text as empty', async () => {
+    const user = userEvent.setup()
+    render(<DetailPanel isCreationMode={true} onCreate={vi.fn()} onClose={vi.fn()} />)
+
+    await user.type(screen.getByLabelText(/title/i), 'New Node')
+    await user.type(screen.getByLabelText('Add label'), '   ')
+
+    expect(screen.getByRole('button', { name: /^create$/i })).toBeDisabled()
+    expect(screen.getByText(/add at least one label/i)).toBeInTheDocument()
+  })
+
+  it('does not gate the edit-mode Save button on labels', () => {
+    render(<DetailPanel atom={makeAtom()} onUpdate={vi.fn()} onClose={vi.fn()} />)
+
+    expect(screen.getByRole('button', { name: /^save$/i })).toBeEnabled()
+    expect(screen.queryByText(/add at least one label/i)).not.toBeInTheDocument()
+  })
+})
+
+describe('DetailPanel — submission failures surface inline', () => {
+  it('shows a mapped message when creation is rejected', async () => {
+    const onCreate = vi.fn().mockRejectedValue(new Error('AU-UNAUTHORIZED'))
+    const user = userEvent.setup()
+    render(<DetailPanel isCreationMode={true} onCreate={onCreate} onClose={vi.fn()} />)
+
+    await user.type(screen.getByLabelText(/title/i), 'New Node')
+    await user.type(screen.getByLabelText('Add label'), 'Tag1{Enter}')
+    await user.click(screen.getByRole('button', { name: /^create$/i }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/don't have access/i)
+  })
+
+  it('falls back to a generic message for an unrecognized server error', async () => {
+    // The original bug: a raw Cypher syntax error carries no known code. It must still be shown,
+    // and must not be rendered verbatim.
+    const onCreate = vi.fn().mockRejectedValue(new Error("Invalid input 'n': expected 'FOREACH'"))
+    const user = userEvent.setup()
+    render(<DetailPanel isCreationMode={true} onCreate={onCreate} onClose={vi.fn()} />)
+
+    await user.type(screen.getByLabelText(/title/i), 'New Node')
+    await user.type(screen.getByLabelText('Add label'), 'Tag1{Enter}')
+    await user.click(screen.getByRole('button', { name: /^create$/i }))
+
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent(/something went wrong/i)
+    expect(alert).not.toHaveTextContent(/FOREACH/)
+  })
+
+  it('re-enables Create after a failure so the user can retry', async () => {
+    const onCreate = vi.fn().mockRejectedValue(new Error('boom'))
+    const user = userEvent.setup()
+    render(<DetailPanel isCreationMode={true} onCreate={onCreate} onClose={vi.fn()} />)
+
+    await user.type(screen.getByLabelText(/title/i), 'New Node')
+    await user.type(screen.getByLabelText('Add label'), 'Tag1{Enter}')
+    await user.click(screen.getByRole('button', { name: /^create$/i }))
+
+    await screen.findByRole('alert')
+    expect(screen.getByRole('button', { name: /^create$/i })).toBeEnabled()
+  })
+
+  it('clears a previous error when the next submit starts', async () => {
+    const onCreate = vi.fn()
+      .mockRejectedValueOnce(new Error('boom'))
+      .mockResolvedValueOnce(undefined)
+    const user = userEvent.setup()
+    render(<DetailPanel isCreationMode={true} onCreate={onCreate} onClose={vi.fn()} />)
+
+    await user.type(screen.getByLabelText(/title/i), 'New Node')
+    await user.type(screen.getByLabelText('Add label'), 'Tag1{Enter}')
+    await user.click(screen.getByRole('button', { name: /^create$/i }))
+    await screen.findByRole('alert')
+
+    await user.click(screen.getByRole('button', { name: /^create$/i }))
+
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('handles a rejection that is not an Error instance', async () => {
+    const onCreate = vi.fn().mockRejectedValue('a bare string rejection')
+    const user = userEvent.setup()
+    render(<DetailPanel isCreationMode={true} onCreate={onCreate} onClose={vi.fn()} />)
+
+    await user.type(screen.getByLabelText(/title/i), 'New Node')
+    await user.type(screen.getByLabelText('Add label'), 'Tag1{Enter}')
+    await user.click(screen.getByRole('button', { name: /^create$/i }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/something went wrong/i)
+  })
+
+  it('shows an inline error when an edit-mode save is rejected', async () => {
+    const onUpdate = vi.fn().mockRejectedValue(new Error('AU-UNAUTHORIZED'))
+    const user = userEvent.setup()
+    render(<DetailPanel atom={makeAtom()} onUpdate={onUpdate} onClose={vi.fn()} />)
+
+    await user.click(screen.getByRole('button', { name: /^save$/i }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/don't have access/i)
   })
 })

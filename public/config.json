@@ -1,5 +1,0 @@
-{
-  "graphqlEndpoint": "http://crystord:5665/graphql",
-  "backendSchemaRange": "~9.2.0",
-  "googleClientId": "175685736190-dtssul3gq9eckth8aua8hdkchl086i4f.apps.googleusercontent.com"
-}

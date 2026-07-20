@@ -1,4 +1,5 @@
-import { test, expect } from '@playwright/test'
+import { test, expect } from './fixtures'
+import { unmockedOperation } from './graphql-mock'
 import type { Page } from '@playwright/test'
 
 /**
@@ -12,7 +13,7 @@ function mockGraphQL(page: Page, opts: { deleteError?: string } = {}) {
 
   return page.route('**/{api,graphql}', (route) => {
     const postData = route.request().postData()
-    if (!postData) return route.continue()
+    if (!postData) return route.fallback()
 
     const body = JSON.parse(postData)
     const query: string = body.query ?? ''
@@ -25,15 +26,6 @@ function mockGraphQL(page: Page, opts: { deleteError?: string } = {}) {
         body: JSON.stringify({ data: { [field]: null }, errors: [{ message }] }),
       })
 
-    if (query.includes('schemaInfo')) {
-      return ok({
-        schemaInfo: {
-          schemaVersion: '9.2.0',
-          schemaHash: '6e1c4572d4a6d485702dc8a3c46491d51b8fc1fb34c032474f4e54e8a4ba01b8',
-          releasedAt: '2026-05-27T00:00:00Z',
-        },
-      })
-    }
     if (query.includes('signin')) return ok({ signin: 'mock-token' })
     if (query.includes('listLabels')) return ok({ listLabels: ['Project', 'Task'] })
 
@@ -53,7 +45,7 @@ function mockGraphQL(page: Page, opts: { deleteError?: string } = {}) {
       return ok({ me: { username: 'demo.user', email: currentEmail, emailVerified: true, authMethods: ['password', 'google'] } })
     }
 
-    return route.continue()
+    return unmockedOperation(page, route, query)
   })
 }
 

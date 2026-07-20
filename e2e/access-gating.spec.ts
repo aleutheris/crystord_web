@@ -1,4 +1,5 @@
-import { test, expect } from '@playwright/test'
+import { test, expect } from './fixtures'
+import { unmockedOperation } from './graphql-mock'
 import type { Page } from '@playwright/test'
 
 /**
@@ -36,25 +37,16 @@ function mockGraphQL(page: Page) {
   ]
   return page.route('**/{api,graphql}', (route) => {
     const postData = route.request().postData()
-    if (!postData) return route.continue()
+    if (!postData) return route.fallback()
     const body = JSON.parse(postData)
     const query: string = body.query ?? ''
     const ok = (data: unknown) =>
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data }) })
 
-    if (query.includes('schemaInfo')) {
-      return ok({
-        schemaInfo: {
-          schemaVersion: '9.2.0',
-          schemaHash: '6e1c4572d4a6d485702dc8a3c46491d51b8fc1fb34c032474f4e54e8a4ba01b8',
-          releasedAt: '2026-05-27T00:00:00Z',
-        },
-      })
-    }
     if (query.includes('signin')) return ok({ signin: 'mock-token' })
     if (query.includes('listLabels')) return ok({ listLabels: ['Doc'] })
     if (query.includes('retrieve')) return ok({ retrieve: atoms })
-    return route.continue()
+    return unmockedOperation(page, route, query)
   })
 }
 

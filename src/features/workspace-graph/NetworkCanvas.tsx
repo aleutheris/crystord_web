@@ -21,6 +21,7 @@ import { DeleteConfirmDialog } from './DeleteConfirmDialog'
 import { UndoNotification } from './UndoNotification'
 import { BondNameDialog } from './BondNameDialog'
 import { useCanvasInteractions } from './use-canvas-interactions'
+import { CanvasActionNotice } from './CanvasActionNotice'
 import { C_PRIMARY, C_CARD_BG, C_ERROR } from '../../styles/tokens'
 
 export interface NetworkCanvasProps {
@@ -103,9 +104,12 @@ export function NetworkCanvas({ data, selectedAtomId, onSelectAtom, onCreateAtom
       role="region"
       aria-label="Network view graph canvas"
       tabIndex={0}
-      style={{ width: '100%', height: '100%', outline: 'none' }}
+      style={{ width: '100%', height: '100%', outline: 'none', position: 'relative' }}
       onKeyDown={ix.onKeyDown}
     >
+      {ix.actionError && (
+        <CanvasActionNotice message={ix.actionError} onDismiss={ix.dismissActionError} />
+      )}
       <ReactFlow
         nodes={nodes}
         edges={edges}

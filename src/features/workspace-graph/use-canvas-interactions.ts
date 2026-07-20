@@ -36,6 +36,11 @@ export function useCanvasInteractions({
   const [pendingConnection, setPendingConnection] = useState<{ source: string; target: string } | null>(null)
   const [confirmDelete, setConfirmDelete] = useState<Atom | null>(null)
   const [undoEntry, setUndoEntry] = useState<UndoEntry | null>(null)
+  // Canvas-local failure notice. These mutations used to swallow errors on the reasoning that a
+  // refetch would correct the state — but that only tells the user *that* nothing changed, never
+  // why, which reads as an inert control. The other views (Table, Classify, Board) all carry an
+  // equivalent strip; known auth codes additionally reach the global banner via the hook.
+  const [actionError, setActionError] = useState<string | null>(null)
 
   const onNodeClick: NodeMouseHandler = useCallback((_event, node) => {
     onSelectAtom(node.id)
@@ -56,9 +61,12 @@ export function useCanvasInteractions({
 
   const handleBondConfirm = useCallback(async (bondName: string) => {
     if (!pendingConnection) return
+    setActionError(null)
     try {
       await addBond(pendingConnection.source, pendingConnection.target, bondName)
-    } catch { /* refetch will correct state */ }
+    } catch {
+      setActionError('Could not create the bond. Please try again.')
+    }
     setPendingConnection(null)
   }, [pendingConnection, addBond])
 
@@ -72,13 +80,16 @@ export function useCanvasInteractions({
     if (!confirmDelete) return
     const deletedAtom = confirmDelete
     setConfirmDelete(null)
+    setActionError(null)
     try {
       await deleteAtom(deletedAtom.properties.shellies.uuid)
       setUndoEntry({ type: 'atom', atom: deletedAtom })
       if (selectedAtomId === deletedAtom.properties.shellies.uuid) {
         onSelectAtom(null)
       }
-    } catch { /* error is visible via refetch */ }
+    } catch {
+      setActionError('Could not delete the atom. Please try again.')
+    }
   }, [confirmDelete, deleteAtom, selectedAtomId, onSelectAtom])
 
   const handleEdgeDelete = useCallback(async (edgeId: string) => {
@@ -92,21 +103,28 @@ export function useCanvasInteractions({
       (b) => b.uuid === edge.target && b.name === String(edge.label) && b.direction === 'from',
     )
     if (!bond) return
+    setActionError(null)
     try {
       await removeBond(edge.source, edge.target, bond.name)
       setUndoEntry({ type: 'bond', atom: sourceAtom, bond })
-    } catch { /* error visible via refetch */ }
+    } catch {
+      setActionError('Could not remove the bond. Please try again.')
+    }
   }, [atoms, edges, removeBond])
 
   const handleUndo = useCallback(async (entry: UndoEntry) => {
     setUndoEntry(null)
+    setActionError(null)
     try {
       if (entry.type === 'atom') {
         await createAtom(entry.atom.properties.nuclearies.title, entry.atom.labels)
       } else if (entry.bond) {
         await addBond(entry.atom.properties.shellies.uuid, entry.bond.uuid, entry.bond.name)
       }
-    } catch { /* best-effort undo */ }
+    } catch {
+      // A failed undo is the worst case to hide: the user believes their delete was reverted.
+      setActionError('Could not undo that change. Please try again.')
+    }
   }, [createAtom, addBond])
 
   const onKeyDown = useCallback((event: React.KeyboardEvent) => {
@@ -152,10 +170,14 @@ export function useCanvasInteractions({
     [pendingConnection, atoms],
   )
 
+  const dismissActionError = useCallback(() => setActionError(null), [])
+
   return {
     pendingConnection,
     confirmDelete,
     undoEntry,
+    actionError,
+    dismissActionError,
     pendingSource,
     pendingTarget,
     onNodeClick,

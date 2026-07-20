@@ -20,6 +20,13 @@ dist-ssr
 .DS_Store
 *.suo
 
+# Generated runtime config. Written by scripts/config.mjs from deploy_config.json's active
+# profile, so a tracked copy would encode one developer's local machine and churn on every
+# profile switch. `npm run dev` and `npm run build` both generate it; `npm run preview` serves
+# the copy build placed in dist/; e2e stubs it per-page (see e2e/fixtures.ts).
+# After a fresh clone, run `npm run config` before any bare `vite` invocation.
+public/config.json
+
 # Test outputs
 /test-results/
 /playwright-report/

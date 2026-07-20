@@ -1,28 +1,13 @@
-import { test, expect } from '@playwright/test'
+import { test, expect } from './fixtures'
+import { unmockedOperation } from './graphql-mock'
 
 function mockGraphQL(page: import('@playwright/test').Page) {
   return page.route('**/{api,graphql}', (route) => {
     const postData = route.request().postData()
-    if (!postData) return route.continue()
+    if (!postData) return route.fallback()
 
     const body = JSON.parse(postData)
     const query: string = body.query ?? ''
-
-    if (query.includes('schemaInfo')) {
-        return route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({
-            data: {
-              schemaInfo: {
-                schemaVersion: '9.2.0',
-                schemaHash: '6e1c4572d4a6d485702dc8a3c46491d51b8fc1fb34c032474f4e54e8a4ba01b8',
-                releasedAt: '2026-05-27T00:00:00Z',
-              },
-            },
-          }),
-      })
-    }
 
     if (query.includes('signin')) {
       const { email, password } = body.variables ?? {}
@@ -40,6 +25,14 @@ function mockGraphQL(page: import('@playwright/test').Page) {
       })
     }
 
+    if (query.includes('logout')) {
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { logout: true } }),
+      })
+    }
+
     // Workspace bootstrap (recommended labels). Mocked so the post-sign-in shell
     // reaches a stable state instead of churning on a failed live request.
     if (query.includes('listLabels')) {
@@ -50,7 +43,7 @@ function mockGraphQL(page: import('@playwright/test').Page) {
       })
     }
 
-    return route.continue()
+    return unmockedOperation(page, route, query)
   })
 }
 

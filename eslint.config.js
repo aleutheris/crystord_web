@@ -21,6 +21,14 @@ export default defineConfig([
     },
   },
   {
+    // Playwright fixtures take a `use` callback. That is not a React hook, but the rules-of-hooks
+    // heuristic matches on the bare name — and no React runs in e2e specs at all.
+    files: ['e2e/**/*.ts'],
+    rules: {
+      'react-hooks/rules-of-hooks': 'off',
+    },
+  },
+  {
     // Prevent hardcoded hex color values — use CSS custom properties from src/styles/tokens.ts
     files: ['src/**/*.{ts,tsx}'],
     ignores: [

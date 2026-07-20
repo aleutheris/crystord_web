@@ -1,4 +1,5 @@
-import { test, expect } from '@playwright/test'
+import { test, expect } from './fixtures'
+import { unmockedOperation } from './graphql-mock'
 
 // Evaluation-reporting fields selected by RETRIEVE_QUERY since ADR-260065 — mocked on every
 // atom so Apollo logs no missing-field warnings.
@@ -61,25 +62,10 @@ function mockGraphQL(
   let retrieveAtoms = BASE_ATOMS
   return page.route('**/{api,graphql}', (route) => {
     const postData = route.request().postData()
-    if (!postData) return route.continue()
+    if (!postData) return route.fallback()
     const body = JSON.parse(postData)
     const query: string = body.query ?? ''
 
-    if (query.includes('schemaInfo')) {
-      return route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          data: {
-            schemaInfo: {
-              schemaVersion: '9.2.0',
-              schemaHash: '6e1c4572d4a6d485702dc8a3c46491d51b8fc1fb34c032474f4e54e8a4ba01b8',
-              releasedAt: '2026-05-27T00:00:00Z',
-            },
-          },
-        }),
-      })
-    }
     if (query.includes('signin')) {
       return route.fulfill({
         status: 200,
@@ -109,7 +95,7 @@ function mockGraphQL(
         body: JSON.stringify({ data: { change: ['new-uuid'] } }),
       })
     }
-    return route.continue()
+    return unmockedOperation(page, route, query)
   })
 }
 
@@ -228,6 +214,34 @@ test.describe('Explicit atom creation', () => {
     await expect(page.getByRole('status', { name: /atom created/i })).toBeVisible()
   })
 
+  test('fills every field without pressing Enter on the label and still creates', async ({ page }) => {
+    // Regression: a label only becomes a chip on Enter, so a visibly complete form left Create
+    // disabled and the panel looked broken.
+    await mockGraphQL(page, [...BASE_ATOMS, NEW_ATOM])
+    await signIn(page)
+    await submitSearch(page)
+
+    await page.getByRole('button', { name: /create atom/i }).click()
+
+    const panel = page.getByRole('complementary', { name: /create atom/i })
+    await panel.getByLabel(/title/i).fill('Gamma')
+    await panel.getByLabel('Add label').fill('Project')
+    await panel.getByLabel(/description/i).fill('New atom')
+    await panel.getByLabel(/content/i).fill('Some content')
+
+    const createButton = panel.getByRole('button', { name: /^create$/i })
+    await expect(createButton).toBeEnabled()
+
+    const createRequest = page.waitForRequest(
+      (r) => /\/(api|graphql)\b/.test(r.url()) && r.postData()?.includes('change') === true,
+    )
+    await createButton.click()
+
+    // The typed-but-uncommitted label must reach the server, not an empty list.
+    const sent = JSON.parse((await createRequest).postData() ?? '{}')
+    expect(sent.variables.inputs[0].labels).toEqual(['Project'])
+  })
+
   test('creation panel closes after successful creation', async ({ page }) => {
     await mockGraphQL(page, [...BASE_ATOMS, NEW_ATOM])
     await signIn(page)
@@ -237,6 +251,10 @@ test.describe('Explicit atom creation', () => {
 
     const panel = page.getByRole('complementary', { name: /create atom/i })
     await panel.getByLabel(/title/i).fill('Gamma')
+    // A label is mandatory at creation — without one the engine gets `labels: []` and builds
+    // invalid Cypher, so Create stays disabled until a chip exists.
+    await panel.getByLabel('Add label').fill('Project')
+    await panel.getByLabel('Add label').press('Enter')
 
     const createResponse = page.waitForResponse(
       (r) => /\/(api|graphql)\b/.test(r.url()) && r.request().postData()?.includes('change') === true,
