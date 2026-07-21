@@ -9,6 +9,8 @@ import {
   UPDATE_CATEGORY_VALUE_MUTATION,
   DELETE_CATEGORY_DIMENSION_MUTATION,
   DELETE_CATEGORY_VALUE_MUTATION,
+  CONNECT_CATEGORY_DIMENSIONS_MUTATION,
+  DISCONNECT_CATEGORY_DIMENSIONS_MUTATION,
 } from '../../api-contract/category-operations'
 import type {
   CategoryBrowseChild,
@@ -30,7 +32,19 @@ export interface CategoryBrowse {
   /** Authoring failure text; unrecognized codes (CAT-*) surface verbatim (ADR-260064). */
   mutationError: string | null
   loadChildren: (node: BrowseNodeRef) => void
-  createDimension: (key: string, displayName: string) => Promise<boolean>
+  createDimension: (key: string, displayName: string, parentDimensionKey?: string | null) => Promise<boolean>
+  /**
+   * Re-parent a dimension (ADR-260071). `nextParent === null` detaches it to a root. Moving a
+   * dimension that already has a parent is disconnect-then-connect — two non-atomic calls,
+   * because connecting over an existing parent is refused (a dimension has one parent). If the
+   * connect half fails the dimension is left a root, and `mutationError` says so explicitly
+   * rather than reporting a plain failure.
+   */
+  setDimensionParent: (
+    dimensionKey: string,
+    currentParent: string | null,
+    nextParent: string | null,
+  ) => Promise<boolean>
   createValue: (key: string, displayName: string, dimensionKey: string, parentNode: BrowseNodeRef) => Promise<boolean>
   renameNode: (node: BrowseNodeRef, displayName: string, parentNode: BrowseNodeRef | null) => Promise<boolean>
   removeNode: (node: BrowseNodeRef, parentNode: BrowseNodeRef | null) => Promise<boolean>
@@ -133,11 +147,76 @@ export function useCategoryBrowse(): CategoryBrowse {
     }
   }, [])
 
-  const createDimension = useCallback((key: string, displayName: string) =>
+  const createDimension = useCallback((key: string, displayName: string, parentDimensionKey?: string | null) =>
     runMutation(async () => {
-      await client.mutate({ mutation: CREATE_CATEGORY_DIMENSION_MUTATION, variables: { key, displayName } })
+      await client.mutate({
+        mutation: CREATE_CATEGORY_DIMENSION_MUTATION,
+        variables: {
+          key,
+          displayName,
+          // Wired atomically at creation — no transient orphan (ADR-260071 §2).
+          ...(parentDimensionKey ? { parentDimensionKeys: [parentDimensionKey] } : {}),
+        },
+      })
       await refreshDimensions()
     }), [client, runMutation, refreshDimensions])
+
+  const setDimensionParent = useCallback(async (
+    dimensionKey: string,
+    currentParent: string | null,
+    nextParent: string | null,
+  ): Promise<boolean> => {
+    if (currentParent === nextParent) return true
+    setMutationError(null)
+    setPending((n) => n + 1)
+    let detached = false
+    let rewired = false
+    try {
+      if (currentParent !== null) {
+        await client.mutate({
+          mutation: DISCONNECT_CATEGORY_DIMENSIONS_MUTATION,
+          variables: { dimensionKey, parentDimensionKeys: [currentParent] },
+        })
+        detached = true
+      }
+      if (nextParent !== null) {
+        await client.mutate({
+          mutation: CONNECT_CATEGORY_DIMENSIONS_MUTATION,
+          variables: { dimensionKey, parentDimensionKeys: [nextParent] },
+        })
+      }
+      // Every mutation landed: the move itself succeeded no matter what the refresh below does.
+      rewired = true
+      await refreshDimensions()
+      return true
+    } catch (err) {
+      // A refresh failure after a completed move is a STALE VIEW, not a failed move. Reporting it
+      // as one would tell the user their dimension is a root when the server has it correctly
+      // parented — the exact inversion of the truth.
+      if (rewired) {
+        surfaceLoadError(err)
+        return true
+      }
+      const msg = err instanceof Error ? err.message : String(err)
+      const outcome = mapAuthError(msg)
+      if (outcome.kind !== 'reauth') {
+        const reason = outcome.code ? outcome.message : msg
+        // The move is two calls. If the detach succeeded and the attach did not, the dimension is
+        // now a root — say so, rather than implying nothing changed.
+        setMutationError(
+          detached && nextParent !== null
+            ? `${reason} "${dimensionKey}" is now a top-level dimension; its new parent was not set.`
+            : reason,
+        )
+      }
+      // A half-completed move changed server state, so the rail must not keep rendering the
+      // pre-move hierarchy.
+      await refreshDimensions().catch(() => {})
+      return false
+    } finally {
+      setPending((n) => n - 1)
+    }
+  }, [client, refreshDimensions, surfaceLoadError])
 
   const createValue = useCallback((key: string, displayName: string, dimensionKey: string, parentNode: BrowseNodeRef) =>
     runMutation(async () => {
@@ -189,6 +268,7 @@ export function useCategoryBrowse(): CategoryBrowse {
     mutationError,
     loadChildren,
     createDimension,
+    setDimensionParent,
     createValue,
     renameNode,
     removeNode,

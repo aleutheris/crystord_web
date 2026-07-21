@@ -7,7 +7,11 @@
  * parse raw messages themselves.
  */
 
-/** Every auth/authz error code the front end recognizes (the epic error table). */
+/**
+ * Every error code the front end maps to a user-facing message. Predominantly the auth/authz
+ * table; ADR-260071 added the two taxonomy-shape codes the dimension-hierarchy controls can
+ * produce. Anything absent here falls through to `UNKNOWN_OUTCOME` and is surfaced generically.
+ */
 export const AUTH_ERROR_CODES = [
   'AUTHZ-AUTHENTICATION-REQUIRED',
   'AUTH-RATE-LIMITED',
@@ -27,6 +31,10 @@ export const AUTH_ERROR_CODES = [
   'CR-15-WORKSPACE-ADMIN-EXISTS',
   'CR-16-PRINCIPAL-UNKNOWN',
   'AU-UNAUTHORIZED',
+  // Taxonomy shape errors reachable by ordinary action from the dimension-hierarchy controls
+  // (ADR-260071). Other CAT-* codes stay on the generic path, surfaced verbatim per ADR-260064.
+  'CAT-MULTIPLE-PARENTS-UNSUPPORTED',
+  'CAT-DIMENSION-CYCLE',
 ] as const
 
 export type AuthErrorCode = (typeof AUTH_ERROR_CODES)[number]
@@ -151,6 +159,16 @@ const OUTCOMES: Record<AuthErrorCode, OutcomeSpec> = {
     kind: 'access',
     field: null,
     message: "You don't have access to do that.",
+  },
+  'CAT-MULTIPLE-PARENTS-UNSUPPORTED': {
+    kind: 'form',
+    field: null,
+    message: 'A dimension can have only one parent. Detach it first, then attach it elsewhere.',
+  },
+  'CAT-DIMENSION-CYCLE': {
+    kind: 'form',
+    field: null,
+    message: "That would place a dimension inside itself. Choose a parent that isn't one of its own descendants.",
   },
 }
 

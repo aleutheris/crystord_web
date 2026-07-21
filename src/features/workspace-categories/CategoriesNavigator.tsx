@@ -3,7 +3,7 @@ import { CategoryTree } from '../../ui-primitives'
 import type { CategoryTreeNode, WorkspaceFilter } from '../../ui-primitives'
 import { C_ERROR, C_TEXT_MUTED } from '../../styles/tokens'
 import { useCategoryBrowse } from './use-category-browse'
-import { buildCategoryTree } from './category-tree'
+import { buildCategoryTree, dimensionSubtreeKeys, dimensionOutline } from './category-tree'
 import { toggleFacetValue } from './facet-utils'
 import { CategoryNodeEditor } from './CategoryNodeEditor'
 import { AddDimensionForm } from './AddDimensionForm'
@@ -66,12 +66,23 @@ export function CategoriesNavigator({ filter, onFilterChange }: CategoriesNaviga
     return meta !== undefined && (meta.accessLevel === 'OWNER' || meta.accessLevel === 'EDITOR')
   }
 
-  async function handleCreateDimension(key: string, displayName: string) {
-    const ok = await browse.createDimension(key, displayName)
+  async function handleCreateDimension(key: string, displayName: string, parentDimensionKey: string | null) {
+    const ok = await browse.createDimension(key, displayName, parentDimensionKey)
     if (ok) setAddingDimension(false)
   }
 
   const editingMeta = editingKey !== null ? tree.index.get(editingKey) : undefined
+
+  // Render order + depth, so the selectors show the hierarchy instead of a flat name list.
+  const allDimensionOptions = useMemo(() => dimensionOutline(tree), [tree])
+
+  // A dimension may not become a child of itself or of its own descendants (ADR-260071). The
+  // exclusion walks the built model, so it can never disagree with the parent the editor seeds from.
+  const editingParentOptions = useMemo(() => {
+    if (editingMeta === undefined || editingMeta.kind !== 'dimension') return []
+    const excluded = dimensionSubtreeKeys(tree, editingMeta.key)
+    return allDimensionOptions.filter((option) => !excluded.has(option.key))
+  }, [editingMeta, tree, allDimensionOptions])
 
   return (
     <div style={{ padding: '0.5rem 0.6rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
@@ -102,7 +113,12 @@ export function CategoriesNavigator({ filter, onFilterChange }: CategoriesNaviga
         <p role="alert" style={{ margin: 0, fontSize: '0.78rem', color: C_ERROR }}>{browse.mutationError}</p>
       )}
 
-      {addingDimension && <AddDimensionForm onSubmit={(key, name) => void handleCreateDimension(key, name)} />}
+      {addingDimension && (
+        <AddDimensionForm
+          parentOptions={allDimensionOptions}
+          onSubmit={(key, name, parentKey) => void handleCreateDimension(key, name, parentKey)}
+        />
+      )}
 
       {tree.nodes.length === 0 && !browse.loading && (
         <p style={{ margin: 0, fontSize: '0.78rem', color: C_TEXT_MUTED }}>No categories yet.</p>
@@ -123,6 +139,7 @@ export function CategoriesNavigator({ filter, onFilterChange }: CategoriesNaviga
           key={editingMeta.key}
           meta={editingMeta}
           browse={browse}
+          parentOptions={editingParentOptions}
           onClose={() => setEditingKey(null)}
         />
       )}

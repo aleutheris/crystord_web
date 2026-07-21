@@ -10,6 +10,8 @@ import {
   UPDATE_CATEGORY_VALUE_MUTATION,
   DELETE_CATEGORY_DIMENSION_MUTATION,
   DELETE_CATEGORY_VALUE_MUTATION,
+  CONNECT_CATEGORY_DIMENSIONS_MUTATION,
+  DISCONNECT_CATEGORY_DIMENSIONS_MUTATION,
 } from '../../api-contract/category-operations'
 
 const mockQuery = vi.fn()
@@ -334,6 +336,271 @@ describe('useCategoryBrowse authoring mutations', () => {
     })
 
     expect(mockQuery).not.toHaveBeenCalled()
+  })
+})
+
+describe('useCategoryBrowse dimension hierarchy (ADR-260071)', () => {
+  /** Mutation docs in call order — the move is two calls and the order is load-bearing. */
+  function mutationSequence() {
+    return mockMutate.mock.calls.map(([args]) => args.mutation)
+  }
+
+  it('createDimension with a parent wires it at creation via parentDimensionKeys', async () => {
+    mockHappyQueries()
+    mockMutate.mockResolvedValue({ data: { createCategoryDimension: { key: 'country' } } })
+    const { result } = await renderBrowse()
+
+    let ok = false
+    await act(async () => { ok = await result.current.createDimension('country', 'Country', 'region') })
+
+    expect(ok).toBe(true)
+    expect(mockMutate).toHaveBeenCalledWith({
+      mutation: CREATE_CATEGORY_DIMENSION_MUTATION,
+      variables: { key: 'country', displayName: 'Country', parentDimensionKeys: ['region'] },
+    })
+  })
+
+  it('createDimension with an explicitly null parent omits parentDimensionKeys entirely', async () => {
+    mockHappyQueries()
+    mockMutate.mockResolvedValue({ data: { createCategoryDimension: { key: 'period' } } })
+    const { result } = await renderBrowse()
+
+    await act(async () => { await result.current.createDimension('period', 'Period', null) })
+
+    // Sending an explicit null would ask the backend to clear the edge rather than skip it.
+    expect(mockMutate).toHaveBeenCalledWith({
+      mutation: CREATE_CATEGORY_DIMENSION_MUTATION,
+      variables: { key: 'period', displayName: 'Period' },
+    })
+  })
+
+  it('attaching a root dimension issues only connect — there is nothing to detach', async () => {
+    mockHappyQueries()
+    mockMutate.mockResolvedValue({ data: { connectCategoryDimensions: { key: 'country' } } })
+    const { result } = await renderBrowse()
+
+    let ok = false
+    await act(async () => { ok = await result.current.setDimensionParent('country', null, 'region') })
+
+    expect(ok).toBe(true)
+    expect(mutationSequence()).toEqual([CONNECT_CATEGORY_DIMENSIONS_MUTATION])
+    expect(mockMutate).toHaveBeenCalledWith({
+      mutation: CONNECT_CATEGORY_DIMENSIONS_MUTATION,
+      variables: { dimensionKey: 'country', parentDimensionKeys: ['region'] },
+    })
+  })
+
+  it('detaching to a root issues only disconnect', async () => {
+    mockHappyQueries()
+    mockMutate.mockResolvedValue({ data: { disconnectCategoryDimensions: { key: 'country' } } })
+    const { result } = await renderBrowse()
+
+    let ok = false
+    await act(async () => { ok = await result.current.setDimensionParent('country', 'region', null) })
+
+    expect(ok).toBe(true)
+    expect(mutationSequence()).toEqual([DISCONNECT_CATEGORY_DIMENSIONS_MUTATION])
+    expect(mockMutate).toHaveBeenCalledWith({
+      mutation: DISCONNECT_CATEGORY_DIMENSIONS_MUTATION,
+      variables: { dimensionKey: 'country', parentDimensionKeys: ['region'] },
+    })
+  })
+
+  it('moving between parents disconnects before connecting', async () => {
+    mockHappyQueries()
+    mockMutate.mockResolvedValue({ data: { connectCategoryDimensions: { key: 'country' } } })
+    const { result } = await renderBrowse()
+
+    await act(async () => { await result.current.setDimensionParent('country', 'region', 'period') })
+
+    // Connecting first would hit CAT-MULTIPLE-PARENTS-UNSUPPORTED — UNDER_CATDIM is single-parent.
+    expect(mutationSequence()).toEqual([
+      DISCONNECT_CATEGORY_DIMENSIONS_MUTATION,
+      CONNECT_CATEGORY_DIMENSIONS_MUTATION,
+    ])
+  })
+
+  it('still reports the move failure when the recovery refresh also fails', async () => {
+    // Both halves down: the mutation fails, and the refresh issued to resync the rail fails too.
+    // The move error is what the user needs; the failed resync must not mask it or throw.
+    mockHappyQueries()
+    mockMutate.mockRejectedValue(new Error('CAT-DIMENSION-CYCLE'))
+    const { result } = await renderBrowse()
+    mockQuery.mockRejectedValue(new Error('Failed to fetch'))
+
+    let ok: boolean | undefined
+    await act(async () => { ok = await result.current.setDimensionParent('country', 'region', 'period') })
+
+    expect(ok).toBe(false)
+    expect(result.current.mutationError).toMatch(/dimension inside itself/i)
+  })
+
+  it('surfaces a non-Error rejection from a move', async () => {
+    mockHappyQueries()
+    mockMutate.mockRejectedValue('connection reset')
+    const { result } = await renderBrowse()
+
+    let ok: boolean | undefined
+    await act(async () => { ok = await result.current.setDimensionParent('country', null, 'region') })
+
+    expect(ok).toBe(false)
+    expect(result.current.mutationError).toContain('connection reset')
+  })
+
+  it('does not report a completed move as half-done when only the refresh fails', async () => {
+    // Regression: refreshDimensions() ran inside the same try as the mutations, so a transient
+    // failure re-fetching the list landed in the catch with `detached` still true and told the user
+    // the dimension was left at the top level — the exact inverse of the server state, where both
+    // mutations had succeeded and the move was complete.
+    mockHappyQueries()
+    mockMutate.mockResolvedValue({ data: { connectCategoryDimensions: { key: 'country' } } })
+    const { result } = await renderBrowse()
+    mockQuery.mockRejectedValue(new Error('Failed to fetch'))
+
+    let ok: boolean | undefined
+    await act(async () => { ok = await result.current.setDimensionParent('country', 'region', 'period') })
+
+    expect(mockMutate).toHaveBeenCalledTimes(2)
+    expect(ok).toBe(true)
+    expect(result.current.mutationError).toBeNull()
+    // The move succeeded but the rail is now stale — that belongs on the load channel.
+    expect(result.current.loadError).not.toBeNull()
+  })
+
+  it('refreshes the dimension list after a successful move', async () => {
+    mockHappyQueries()
+    mockMutate.mockResolvedValue({ data: { connectCategoryDimensions: { key: 'country' } } })
+    const { result } = await renderBrowse()
+    mockQuery.mockClear()
+
+    await act(async () => { await result.current.setDimensionParent('country', 'region', 'period') })
+
+    expect(mockQuery).toHaveBeenCalledWith(expect.objectContaining({ query: RETRIEVE_CATEGORY_DIMENSIONS_QUERY }))
+  })
+
+  it('re-selecting the current parent is a no-op — no mutations, still succeeds', async () => {
+    mockHappyQueries()
+    const { result } = await renderBrowse()
+
+    let ok = false
+    await act(async () => { ok = await result.current.setDimensionParent('country', 'region', 'region') })
+
+    expect(ok).toBe(true)
+    expect(mockMutate).not.toHaveBeenCalled()
+  })
+
+  it('leaving an already-root dimension at root is a no-op', async () => {
+    mockHappyQueries()
+    const { result } = await renderBrowse()
+
+    let ok = false
+    await act(async () => { ok = await result.current.setDimensionParent('region', null, null) })
+
+    expect(ok).toBe(true)
+    expect(mockMutate).not.toHaveBeenCalled()
+  })
+
+  it('reports the dimension as top-level when the detach lands but the attach fails', async () => {
+    mockHappyQueries()
+    mockMutate.mockResolvedValueOnce({ data: { disconnectCategoryDimensions: { key: 'country' } } })
+    mockMutate.mockRejectedValueOnce(new Error('CAT-DIMENSION-NOT-FOUND: no such parent'))
+    const { result } = await renderBrowse()
+
+    let ok = true
+    await act(async () => { ok = await result.current.setDimensionParent('country', 'region', 'period') })
+
+    // The move is not atomic: the user must learn the dimension moved to the root, not that
+    // nothing happened, or they will re-read the rail as unchanged.
+    expect(ok).toBe(false)
+    expect(result.current.mutationError).toContain('CAT-DIMENSION-NOT-FOUND: no such parent')
+    expect(result.current.mutationError).toMatch(/top-level/i)
+    expect(result.current.mutationError).toContain('country')
+  })
+
+  it('refreshes the dimension list after a half-completed move', async () => {
+    mockHappyQueries()
+    mockMutate.mockResolvedValueOnce({ data: { disconnectCategoryDimensions: { key: 'country' } } })
+    mockMutate.mockRejectedValueOnce(new Error('CAT-DIMENSION-CYCLE'))
+    const { result } = await renderBrowse()
+    mockQuery.mockClear()
+
+    await act(async () => { await result.current.setDimensionParent('country', 'region', 'period') })
+
+    // Server state changed even though the move failed — the rail must not keep the old hierarchy.
+    expect(mockQuery).toHaveBeenCalledWith(expect.objectContaining({ query: RETRIEVE_CATEGORY_DIMENSIONS_QUERY }))
+  })
+
+  it('a failing disconnect does not claim the dimension became top-level', async () => {
+    mockHappyQueries()
+    mockMutate.mockRejectedValue(new Error('CAT-DIMENSION-NOT-FOUND'))
+    const { result } = await renderBrowse()
+
+    let ok = true
+    await act(async () => { ok = await result.current.setDimensionParent('country', 'region', 'period') })
+
+    // Nothing was detached, so the dimension still sits under its original parent.
+    expect(ok).toBe(false)
+    expect(result.current.mutationError).toBe('CAT-DIMENSION-NOT-FOUND')
+  })
+
+  it('a failing attach on a root dimension does not claim it became top-level', async () => {
+    mockHappyQueries()
+    mockMutate.mockRejectedValue(new Error('CAT-DIMENSION-CYCLE'))
+    const { result } = await renderBrowse()
+
+    let ok = true
+    await act(async () => { ok = await result.current.setDimensionParent('country', null, 'region') })
+
+    // It was already a root — reporting a change would be false.
+    expect(ok).toBe(false)
+    expect(result.current.mutationError).not.toMatch(/top-level/i)
+  })
+
+  it('maps CAT-MULTIPLE-PARENTS-UNSUPPORTED to its guidance message', async () => {
+    mockHappyQueries()
+    mockMutate.mockRejectedValue(new Error('CAT-MULTIPLE-PARENTS-UNSUPPORTED'))
+    const { result } = await renderBrowse()
+
+    await act(async () => { await result.current.setDimensionParent('country', null, 'region') })
+
+    expect(result.current.mutationError).toMatch(/only one parent/i)
+    expect(result.current.mutationError).not.toContain('CAT-MULTIPLE-PARENTS-UNSUPPORTED')
+  })
+
+  it('maps CAT-DIMENSION-CYCLE to its guidance message', async () => {
+    mockHappyQueries()
+    mockMutate.mockRejectedValue(new Error('CAT-DIMENSION-CYCLE'))
+    const { result } = await renderBrowse()
+
+    await act(async () => { await result.current.setDimensionParent('region', null, 'country') })
+
+    expect(result.current.mutationError).toMatch(/inside itself/i)
+    expect(result.current.mutationError).not.toContain('CAT-DIMENSION-CYCLE')
+  })
+
+  it('stays silent on session expiry during a move', async () => {
+    mockHappyQueries()
+    mockMutate.mockRejectedValue(new Error('AUTHZ-AUTHENTICATION-REQUIRED'))
+    const { result } = await renderBrowse()
+
+    let ok = true
+    await act(async () => { ok = await result.current.setDimensionParent('country', 'region', 'period') })
+
+    expect(ok).toBe(false)
+    expect(result.current.mutationError).toBeNull()
+  })
+
+  it('a new move clears the previous mutation error', async () => {
+    mockHappyQueries()
+    mockMutate.mockRejectedValueOnce(new Error('CAT-DIMENSION-CYCLE'))
+    mockMutate.mockResolvedValue({ data: { connectCategoryDimensions: { key: 'country' } } })
+    const { result } = await renderBrowse()
+
+    await act(async () => { await result.current.setDimensionParent('country', null, 'region') })
+    expect(result.current.mutationError).toMatch(/inside itself/i)
+
+    await act(async () => { await result.current.setDimensionParent('country', null, 'period') })
+    expect(result.current.mutationError).toBeNull()
   })
 })
 

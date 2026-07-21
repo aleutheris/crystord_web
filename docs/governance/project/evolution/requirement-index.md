@@ -114,13 +114,14 @@ A terminal requirement (`Superseded by <id>` / `Withdrawn`) keeps a tombstone ro
 | REQ-QR-260008 | Authentication & Authorization Security, Reliability, and Coverage | QR | Proposed | ADR-260054 | BI-260054, BI-260055, BI-260056, BI-260057, BI-260058, BI-260059, BI-260060, BI-260061 |
 | REQ-FR-260070 | Table View as a Registered Center View with Inline Editing | FR | Active | ADR-260062, ADR-260032 | EPIC-260071 |
 | REQ-FR-260071 | Classify Inspector with Label and Category Chip Editing | FR | Active | ADR-260063 | EPIC-260067 |
-| REQ-FR-260072 | Categories Navigator with Faceted Working-Set Scoping | FR | Active | ADR-260064 | EPIC-260068 |
+| REQ-FR-260072 | Categories Navigator with Faceted Working-Set Scoping | FR | Active | ADR-260071 | EPIC-260068 |
 | REQ-FR-260073 | Compute Formula Builder with Evaluation Transparency | FR | Active | ADR-260065 | EPIC-260069 |
 | REQ-FR-260074 | Account Menu, Workspace Management, and Preferences Surface | FR | Active | ADR-260066 | EPIC-260070 |
 | REQ-FR-260075 | Level-of-Detail Node Rendering in the Flow View | FR | Active | ADR-260067 | EPIC-260072 |
 | REQ-FR-260076 | History Inspector Tab with Field-Level Change Audit | FR | Active | ADR-260068 | EPIC-260073 |
 | REQ-FR-260077 | Share Inspector Tab with Grant and Revoke Flows | FR | Active | ADR-260069 | EPIC-260074 |
 | REQ-FR-260078 | Board View for Bulk Classification by Dimension | FR | Active | ADR-260070 | EPIC-260075 |
+| REQ-FR-260079 | Hierarchical Category Dimensions | FR | Active | ADR-260071 | EPIC-260076 |
 
 ## Superseded
 

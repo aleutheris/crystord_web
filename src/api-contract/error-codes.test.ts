@@ -27,12 +27,14 @@ const EXPECTED: Record<AuthErrorCode, { kind: AuthErrorKind; field: AuthErrorFie
   'CR-15-WORKSPACE-ADMIN-EXISTS': { kind: 'form', field: null },
   'CR-16-PRINCIPAL-UNKNOWN': { kind: 'form', field: null },
   'AU-UNAUTHORIZED': { kind: 'access', field: null },
+  'CAT-MULTIPLE-PARENTS-UNSUPPORTED': { kind: 'form', field: null },
+  'CAT-DIMENSION-CYCLE': { kind: 'form', field: null },
 }
 
 describe('AUTH_ERROR_CODES', () => {
-  it('covers exactly the epic error table (18 codes)', () => {
-    expect(AUTH_ERROR_CODES).toHaveLength(18)
-    expect(new Set(AUTH_ERROR_CODES).size).toBe(18)
+  it('covers exactly the mapped error table (18 auth/authz + 2 taxonomy shape codes)', () => {
+    expect(AUTH_ERROR_CODES).toHaveLength(20)
+    expect(new Set(AUTH_ERROR_CODES).size).toBe(20)
     expect(Object.keys(EXPECTED).sort()).toEqual([...AUTH_ERROR_CODES].sort())
   })
 

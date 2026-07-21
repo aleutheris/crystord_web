@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { CategoriesNavigator } from './CategoriesNavigator'
 import type { CategoryBrowse } from './use-category-browse'
@@ -16,6 +16,10 @@ function dim(key: string, displayName: string, accessLevel: CategoryDimension['a
   return { key, displayName, description: null, parentDimensionKeys: [], accessLevel, ownerUsername: 'demo' }
 }
 
+function childDim(key: string, displayName: string, parentDimensionKey: string): CategoryDimension {
+  return { ...dim(key, displayName), parentDimensionKeys: [parentDimensionKey] }
+}
+
 function child(key: string, displayName: string, dimensionKey: string, atomCount: number, accessLevel: CategoryBrowseChild['value']['accessLevel'] = 'OWNER'): CategoryBrowseChild {
   return { value: { key, displayName, dimensionKey, parentValueKeys: [], accessLevel }, atomCount }
 }
@@ -29,6 +33,7 @@ function makeBrowse(overrides: Partial<CategoryBrowse> = {}): CategoryBrowse {
     mutationError: null,
     loadChildren: vi.fn(),
     createDimension: vi.fn().mockResolvedValue(true),
+    setDimensionParent: vi.fn().mockResolvedValue(true),
     createValue: vi.fn().mockResolvedValue(true),
     renameNode: vi.fn().mockResolvedValue(true),
     removeNode: vi.fn().mockResolvedValue(true),
@@ -221,7 +226,7 @@ describe('CategoriesNavigator authoring (Q2 gating + inline editor)', () => {
     await userEvent.type(screen.getByLabelText('New dimension key'), 'period')
     await userEvent.type(screen.getByLabelText('New dimension name'), 'Period')
     await userEvent.click(screen.getByRole('button', { name: 'Create dimension' }))
-    expect(mockBrowse.current.createDimension).toHaveBeenCalledWith('period', 'Period')
+    expect(mockBrowse.current.createDimension).toHaveBeenCalledWith('period', 'Period', null)
     // Success closes the form.
     expect(screen.queryByLabelText('New dimension key')).not.toBeInTheDocument()
   })
@@ -251,5 +256,135 @@ describe('CategoriesNavigator authoring (Q2 gating + inline editor)', () => {
     expect(screen.getByLabelText('New dimension key')).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: '+ Add dimension' }))
     expect(screen.queryByLabelText('New dimension key')).not.toBeInTheDocument()
+  })
+})
+
+describe('CategoriesNavigator hierarchical dimensions (ADR-260071)', () => {
+  // Alpha ▸ Beta ▸ Gamma, plus an unrelated root — enough depth to tell "excludes the subtree"
+  // apart from "offers nothing at all".
+  function nestedDimensions() {
+    return [dim('a', 'Alpha'), childDim('b', 'Beta', 'a'), childDim('c', 'Gamma', 'b'), dim('z', 'Zeta')]
+  }
+
+  function parentOptionNames(label = 'Parent dimension') {
+    return within(screen.getByLabelText(label))
+      .getAllByRole('option')
+      .map((option) => option.textContent)
+  }
+
+  it('offers every dimension as a parent when adding a new one', async () => {
+    mockBrowse.current = makeBrowse({ dimensions: nestedDimensions() })
+    render(<CategoriesNavigator />)
+    await userEvent.click(screen.getByRole('button', { name: '+ Add dimension' }))
+    // Nothing is excluded here: a brand-new dimension cannot be its own ancestor. Options carry
+    // their depth as indentation and follow render order — a flat list of names would not say
+    // which branch a candidate parent sits in.
+    expect(parentOptionNames()).toEqual([
+      'No parent (top level)',
+      'Alpha',
+      '\u00a0\u00a0\u00a0\u00a0Beta',
+      '\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0Gamma',
+      'Zeta',
+    ])
+  })
+
+  it('creates the dimension under the selected parent', async () => {
+    mockBrowse.current = makeBrowse({ dimensions: nestedDimensions() })
+    render(<CategoriesNavigator />)
+    await userEvent.click(screen.getByRole('button', { name: '+ Add dimension' }))
+    await userEvent.type(screen.getByLabelText('New dimension key'), 'd')
+    await userEvent.type(screen.getByLabelText('New dimension name'), 'Delta')
+    await userEvent.selectOptions(screen.getByLabelText('Parent dimension'), 'b')
+    await userEvent.click(screen.getByRole('button', { name: 'Create dimension' }))
+    expect(mockBrowse.current.createDimension).toHaveBeenCalledWith('d', 'Delta', 'b')
+  })
+
+  it('reverting the parent selection to top level creates a root dimension', async () => {
+    mockBrowse.current = makeBrowse({ dimensions: nestedDimensions() })
+    render(<CategoriesNavigator />)
+    await userEvent.click(screen.getByRole('button', { name: '+ Add dimension' }))
+    await userEvent.type(screen.getByLabelText('New dimension key'), 'd')
+    await userEvent.type(screen.getByLabelText('New dimension name'), 'Delta')
+    await userEvent.selectOptions(screen.getByLabelText('Parent dimension'), 'b')
+    await userEvent.selectOptions(screen.getByLabelText('Parent dimension'), '')
+    await userEvent.click(screen.getByRole('button', { name: 'Create dimension' }))
+    expect(mockBrowse.current.createDimension).toHaveBeenCalledWith('d', 'Delta', null)
+  })
+
+  it('excludes the edited dimension and its whole subtree from its own parent options', async () => {
+    mockBrowse.current = makeBrowse({ dimensions: nestedDimensions() })
+    render(<CategoriesNavigator />)
+    await userEvent.click(screen.getByRole('button', { name: 'Edit Alpha' }))
+    // Selecting Alpha, Beta or Gamma would build a cycle the server rejects with
+    // CAT-DIMENSION-CYCLE; Zeta proves the list is filtered rather than simply empty.
+    expect(parentOptionNames('Parent dimension for Alpha')).toEqual(['No parent (top level)', 'Zeta'])
+  })
+
+  it('offers a mid-level dimension every parent except its own descendants', async () => {
+    mockBrowse.current = makeBrowse({ dimensions: nestedDimensions() })
+    render(<CategoriesNavigator />)
+    await userEvent.click(screen.getByRole('button', { name: 'Expand Alpha' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Edit Beta' }))
+    // Alpha is Beta's current parent and stays selectable — only Beta and Gamma are illegal.
+    expect(parentOptionNames('Parent dimension for Beta')).toEqual(['No parent (top level)', 'Alpha', 'Zeta'])
+  })
+
+  it('preselects the current parent of the edited dimension', async () => {
+    mockBrowse.current = makeBrowse({ dimensions: nestedDimensions() })
+    render(<CategoriesNavigator />)
+    await userEvent.click(screen.getByRole('button', { name: 'Expand Alpha' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Edit Beta' }))
+    expect(screen.getByLabelText('Parent dimension for Beta')).toHaveValue('a')
+  })
+
+  it('keeps the two parent selectors distinguishable when both panels are open', async () => {
+    // Regression: the add-dimension form and the node editor are independent state, so both can be
+    // open at once. Both render a parent selector, and when they shared the accessible name
+    // "Parent dimension" the two were indistinguishable to a screen reader (and to getByLabelText,
+    // which threw on the ambiguity).
+    mockBrowse.current = makeBrowse({ dimensions: nestedDimensions() })
+    render(<CategoriesNavigator />)
+    await userEvent.click(screen.getByRole('button', { name: '+ Add dimension' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Edit Alpha' }))
+
+    expect(screen.getByLabelText('Parent dimension')).toBeInTheDocument()
+    expect(screen.getByLabelText('Parent dimension for Alpha')).toBeInTheDocument()
+  })
+
+  it('offers no parent options when editing a value node', async () => {
+    mockBrowse.current = makeBrowse({
+      dimensions: nestedDimensions(),
+      childrenByNode: new Map([['a', [child('europe', 'Europe', 'a', 7)]]]),
+    })
+    render(<CategoriesNavigator />)
+    await userEvent.click(screen.getByRole('button', { name: 'Expand Alpha' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Edit Europe' }))
+    // Re-parenting is a dimension-only operation — UNDER_CATDIM has no value counterpart here.
+    expect(screen.getByRole('region', { name: 'Edit Europe' })).toBeInTheDocument()
+    expect(screen.queryByLabelText('Parent dimension for Europe')).not.toBeInTheDocument()
+  })
+
+  it('renders nested dimensions beneath their parent as the tree is expanded', async () => {
+    mockBrowse.current = makeBrowse({ dimensions: nestedDimensions() })
+    render(<CategoriesNavigator />)
+    // Only roots are on top: the hierarchy comes from parentDimensionKeys, not from browse.
+    expect(screen.getByRole('button', { name: 'Alpha' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Zeta' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Beta' })).not.toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Expand Alpha' }))
+    expect(screen.getByRole('button', { name: 'Beta' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Gamma' })).not.toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Expand Beta' }))
+    expect(screen.getByRole('button', { name: 'Gamma' })).toBeInTheDocument()
+  })
+
+  it('expanding a nested dimension browses that dimension, not its parent', async () => {
+    mockBrowse.current = makeBrowse({ dimensions: nestedDimensions() })
+    render(<CategoriesNavigator />)
+    await userEvent.click(screen.getByRole('button', { name: 'Expand Alpha' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Expand Beta' }))
+    expect(mockBrowse.current.loadChildren).toHaveBeenCalledWith({ kind: 'dimension', key: 'b' })
   })
 })

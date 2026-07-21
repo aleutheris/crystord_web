@@ -158,8 +158,34 @@ export interface CategoryFilter {
 // --- Taxonomy authoring mutations (ADR-260064 / EPIC-260068 — inline rail authoring, Q2) ---
 
 export const CREATE_CATEGORY_DIMENSION_MUTATION = gql`
-  mutation CreateCategoryDimension($key: String!, $displayName: String!, $description: String) {
-    createCategoryDimension(key: $key, displayName: $displayName, description: $description) {
+  mutation CreateCategoryDimension($key: String!, $displayName: String!, $description: String, $parentDimensionKeys: [String!]) {
+    createCategoryDimension(key: $key, displayName: $displayName, description: $description, parentDimensionKeys: $parentDimensionKeys) {
+      key
+    }
+  }
+`
+
+/**
+ * Dimension hierarchy wiring (ADR-260071 / EPIC-260076). `UNDER_CATDIM` is single-parent for v1:
+ * connecting a dimension that already has a parent is refused, so **moving** a dimension is
+ * disconnect-then-connect — two calls, not atomic. Disconnecting to no parent makes it a root.
+ *
+ * The schema also accepts `childDimensionKeys` on both operations (attach/detach from the parent's
+ * side). It is deliberately not declared here: v1 re-parents from the child, so nothing would pass
+ * it, and an unused variable is contract surface that reads as supported. Re-add it with the
+ * caller that needs it.
+ */
+export const CONNECT_CATEGORY_DIMENSIONS_MUTATION = gql`
+  mutation ConnectCategoryDimensions($dimensionKey: String!, $parentDimensionKeys: [String!]) {
+    connectCategoryDimensions(dimensionKey: $dimensionKey, parentDimensionKeys: $parentDimensionKeys) {
+      key
+    }
+  }
+`
+
+export const DISCONNECT_CATEGORY_DIMENSIONS_MUTATION = gql`
+  mutation DisconnectCategoryDimensions($dimensionKey: String!, $parentDimensionKeys: [String!]) {
+    disconnectCategoryDimensions(dimensionKey: $dimensionKey, parentDimensionKeys: $parentDimensionKeys) {
       key
     }
   }
