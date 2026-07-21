@@ -18,6 +18,7 @@ import { enabledViews, initialActiveView } from './slots'
 import { WorkspaceProvider, type WorkspaceContextValue } from './workspace-context'
 import { usePreferences } from './use-preferences'
 import { Inspector } from './Inspector'
+import { ViewErrorBoundary } from './ViewErrorBoundary'
 import { AccountMenu } from './AccountMenu'
 import { PreferencesPanel } from './PreferencesPanel'
 import { C_BORDER } from '../styles/tokens'
@@ -142,14 +143,18 @@ export function WorkspaceShell({ googleClientId }: { googleClientId?: string }) 
                 mode={renderMode}
                 onConfirm={confirmRender}
               >
-                <ActiveView
-                  data={graphData}
-                  selectedAtomId={selectedAtomId}
-                  onSelectAtom={setSelectedAtomId}
-                  onCreateAtom={() => setIsCreatingAtom(true)}
-                  renderMode={canvasMode}
-                  computeBadges={preferences.computeBadges}
-                />
+                {/* Keyed by view so switching views clears any prior crash fallback. Contains a
+                    render throw (e.g. malformed node data) to this pane instead of the whole app. */}
+                <ViewErrorBoundary key={activeView}>
+                  <ActiveView
+                    data={graphData}
+                    selectedAtomId={selectedAtomId}
+                    onSelectAtom={setSelectedAtomId}
+                    onCreateAtom={() => setIsCreatingAtom(true)}
+                    renderMode={canvasMode}
+                    computeBadges={preferences.computeBadges}
+                  />
+                </ViewErrorBoundary>
               </GraphRenderGate>
             </div>
 

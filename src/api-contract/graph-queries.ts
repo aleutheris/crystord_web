@@ -147,6 +147,35 @@ export interface RetrieveResponse {
   retrieve: Atom[]
 }
 
+/**
+ * Enforce the `AtomNuclearies.content: string` contract at the network boundary.
+ *
+ * A computed atom's result rides in `content` (see the note on evaluation reporting above), and
+ * the backend returns that result with its native JSON type — a SUM comes back as a *number*.
+ * The declared contract is `string`, and every consumer (the Flow LOD block's `truncateValue`,
+ * the Table cell, the detail panel) relies on it, so an un-coerced number throws
+ * `value.slice is not a function` and, without an error boundary, blanks the whole workspace.
+ *
+ * Coercing here — once, at ingestion — keeps that guarantee in one place instead of scattering
+ * defensive `String(...)` calls across every render site. `null`/absent content stays `''`, the
+ * treatment the UI already gives it. (The backend arguably should stringify the result itself;
+ * that is an engine-side concern, but the client must not crash on a contract it declares.)
+ */
+export function normalizeAtomContent(atom: Atom): Atom {
+  const { content } = atom.properties.nuclearies
+  if (typeof content === 'string') return atom
+  return {
+    ...atom,
+    properties: {
+      ...atom.properties,
+      nuclearies: {
+        ...atom.properties.nuclearies,
+        content: content == null ? '' : String(content),
+      },
+    },
+  }
+}
+
 export interface ListLabelsResponse {
   listLabels: string[]
 }

@@ -499,3 +499,30 @@ describe('useGraphData createAtom success path', () => {
     expect(created).toBeNull()
   })
 })
+
+describe('useGraphData normalizes non-string content at ingestion', () => {
+  it('coerces a numeric computed result to a string so downstream views never see a number', async () => {
+    // Reproduces the whitescreen: a SUM atom's content came back as a number, and the Flow LOD
+    // block's truncateValue(content) threw `value.slice is not a function`.
+    const numericContentAtom = {
+      labels: ['Math'],
+      bonds: [],
+      accessLevel: 'OWNER',
+      properties: {
+        shellies: { uuid: 'sum-1' },
+        nuclearies: {
+          title: 'Total', description: '', content: 12,
+          operation: '{"name":"SUM","args":["a","b"]}', constants: {},
+        },
+      },
+    }
+    mockQuery.mockResolvedValue({ data: { retrieve: [numericContentAtom] } })
+    const { result } = renderHook(() => useGraphData())
+
+    await act(() => result.current.search(['Math']))
+
+    const content = result.current.atoms[0]!.properties.nuclearies.content
+    expect(content).toBe('12')
+    expect(typeof content).toBe('string')
+  })
+})

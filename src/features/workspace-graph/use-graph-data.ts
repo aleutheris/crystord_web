@@ -5,6 +5,7 @@ import {
   CREATE_ATOMS_MUTATION,
   UPDATE_ATOM_MUTATION,
   DESTROY_ATOMS_MUTATION,
+  normalizeAtomContent,
 } from '../../api-contract/graph-queries'
 import type {
   Atom,
@@ -79,7 +80,7 @@ export function useGraphData(): GraphData {
         fetchPolicy: 'network-only',
       })
 
-      setAtoms(data?.retrieve ?? [])
+      setAtoms((data?.retrieve ?? []).map(normalizeAtomContent))
     } catch (err) {
       const msg = messageOf(err)
       const outcome = mapAuthError(msg)
