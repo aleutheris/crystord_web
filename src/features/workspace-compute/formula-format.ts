@@ -1,4 +1,5 @@
 import type { Atom, OperationPayload } from '../../api-contract'
+import { collectQueryRequiresLabels, isCollectOperation } from './operation-metadata'
 
 /**
  * Pure display helpers for the Compute tab (ADR-260065 / EPIC-260069): resolve payload
@@ -31,14 +32,43 @@ export function describeArg(
   return shortUuid(arg)
 }
 
-/** Formula summary line, e.g. `SUM(Alpha, taxRate)`. */
+/**
+ * Formula summary line, e.g. `SUM(Alpha, taxRate)`.
+ *
+ * A label-consuming COLLECT also renders its `labels` constant — `COLLECT(atoms_with_labels →
+ * Invoice)`. Without it the summary is identical whether labels are set or empty, which is how a
+ * collect-everything formula stayed invisible after saving. Queries whose requirements we do not
+ * know (free-text) render unchanged.
+ */
 export function formatFormula(
   payload: OperationPayload,
   atoms: readonly Atom[] | undefined,
   constants: Record<string, unknown> | null | undefined,
 ): string {
+  if (isCollectOperation(payload.name)) return formatCollect(payload, constants)
   const parts = payload.args.map((arg) => describeArg(arg, atoms, constants))
   return `${payload.name}(${parts.join(', ')})`
+}
+
+/**
+ * COLLECT's arg is a registered query NAME, not an atom reference — so it renders verbatim
+ * rather than through `describeArg`, which would shorten it like an out-of-set UUID
+ * (`atoms_with_labels` → `atoms_wi…`).
+ */
+function formatCollect(
+  payload: OperationPayload,
+  constants: Record<string, unknown> | null | undefined,
+): string {
+  const query = payload.args[0] ?? ''
+  if (!collectQueryRequiresLabels(query)) return `${payload.name}(${payload.args.join(', ')})`
+  const labels = collectedLabels(constants)
+  return `${payload.name}(${query} → ${labels.length > 0 ? labels.join(', ') : 'no labels'})`
+}
+
+/** The `labels` constant as a string list; anything else reads as no labels. */
+function collectedLabels(constants: Record<string, unknown> | null | undefined): string[] {
+  const raw = constants?.['labels']
+  return Array.isArray(raw) ? raw.filter((l): l is string => typeof l === 'string') : []
 }
 
 /** Count of args that are inputs (not constant keys) — the N in "computed from N inputs". */

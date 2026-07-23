@@ -174,7 +174,40 @@ describe('FormulaBuilder — COLLECT', () => {
 
     await userEvent.type(screen.getByLabelText('Custom collect query name'), 'atoms_by_owner')
     await userEvent.click(screen.getByRole('button', { name: 'Save formula' }))
+    // An unregistered query has no known label requirement, so an empty list stays permitted.
     expect(onSave).toHaveBeenCalledWith({ name: 'COLLECT', args: ['atoms_by_owner'] }, { labels: [] })
+  })
+
+  it('blocks saving atoms_with_labels with no labels — it would collect every owned atom', async () => {
+    const { onSave } = renderBuilder({ initial: { name: 'COLLECT', args: ['atoms_with_labels'] } })
+    expect(
+      screen.getByText('Add at least one label — this query would otherwise collect every atom you own.'),
+    ).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Save formula' })).toBeDisabled()
+
+    await userEvent.type(screen.getByLabelText('Add label'), 'Revenue{Enter}')
+    await userEvent.click(screen.getByRole('button', { name: 'Save formula' }))
+    expect(onSave).toHaveBeenCalledWith({ name: 'COLLECT', args: ['atoms_with_labels'] }, { labels: ['Revenue'] })
+  })
+
+  it('commits a typed-but-un-Entered label instead of dropping it (ADR-260027 D2)', async () => {
+    const { onSave } = renderBuilder({ initial: { name: 'COLLECT', args: ['atoms_with_labels'] } })
+    // No Enter: the chip never forms, but the draft is what the user meant to collect.
+    await userEvent.type(screen.getByLabelText('Add label'), 'Invoice')
+    expect(screen.getByRole('button', { name: 'Save formula' })).toBeEnabled()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Save formula' }))
+    expect(onSave).toHaveBeenCalledWith({ name: 'COLLECT', args: ['atoms_with_labels'] }, { labels: ['Invoice'] })
+  })
+
+  it('does not double-add a draft that already exists as a chip', async () => {
+    const { onSave } = renderBuilder({ initial: { name: 'COLLECT', args: ['atoms_with_labels'] } })
+    const labelInput = screen.getByLabelText('Add label')
+    await userEvent.type(labelInput, 'Invoice{Enter}')
+    await userEvent.type(labelInput, 'Invoice')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Save formula' }))
+    expect(onSave).toHaveBeenCalledWith({ name: 'COLLECT', args: ['atoms_with_labels'] }, { labels: ['Invoice'] })
   })
 
   it('pre-fills a known COLLECT payload with its labels constant', () => {

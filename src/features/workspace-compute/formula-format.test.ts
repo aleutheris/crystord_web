@@ -64,6 +64,27 @@ describe('formatFormula', () => {
   it('renders an empty arg list', () => {
     expect(formatFormula({ name: 'COLLECT', args: [] }, ATOMS, {})).toBe('COLLECT()')
   })
+
+  it('renders the labels a label-consuming COLLECT actually collects', () => {
+    expect(
+      formatFormula({ name: 'COLLECT', args: ['atoms_with_labels'] }, ATOMS, { labels: ['Invoice', '2025'] }),
+    ).toBe('COLLECT(atoms_with_labels → Invoice, 2025)')
+  })
+
+  it('names an empty labels constant rather than rendering the same line as a filtered one', () => {
+    expect(
+      formatFormula({ name: 'COLLECT', args: ['atoms_with_labels'] }, ATOMS, { labels: [] }),
+    ).toBe('COLLECT(atoms_with_labels → no labels)')
+    expect(
+      formatFormula({ name: 'COLLECT', args: ['atoms_with_labels'] }, ATOMS, null),
+    ).toBe('COLLECT(atoms_with_labels → no labels)')
+  })
+
+  it('leaves a query with unknown requirements unchanged', () => {
+    expect(
+      formatFormula({ name: 'COLLECT', args: ['atoms_by_owner'] }, ATOMS, {}),
+    ).toBe('COLLECT(atoms_by_owner)')
+  })
 })
 
 describe('countInputArgs', () => {

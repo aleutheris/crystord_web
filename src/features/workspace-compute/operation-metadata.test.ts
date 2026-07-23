@@ -4,6 +4,7 @@ import {
   COLLECT_QUERIES,
   FALLBACK_OPERATIONS,
   argBounds,
+  collectQueryRequiresLabels,
   isCollectOperation,
 } from './operation-metadata'
 
@@ -34,6 +35,13 @@ describe('operation metadata table', () => {
 
   it('the registered COLLECT queries are label-only today', () => {
     expect(COLLECT_QUERIES).toEqual(['atoms_with_labels'])
+  })
+
+  it('marks atoms_with_labels as label-requiring and unknown queries as not', () => {
+    // Empty labels is not a no-op server-side (vacuous AND matches every owned atom).
+    expect(collectQueryRequiresLabels('atoms_with_labels')).toBe(true)
+    expect(collectQueryRequiresLabels('atoms_by_owner')).toBe(false)
+    expect(collectQueryRequiresLabels('')).toBe(false)
   })
 
   it('the offline fallback catalog covers exactly the built-ins', () => {

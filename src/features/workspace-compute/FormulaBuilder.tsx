@@ -2,7 +2,7 @@ import { useState } from 'react'
 import type { Atom, OperationPayload } from '../../api-contract'
 import { LabelChipEditor } from '../../ui-primitives'
 import { C_TEXT_SECONDARY, C_ERROR } from '../../styles/tokens'
-import { argBounds, isCollectOperation, COLLECT_QUERIES } from './operation-metadata'
+import { argBounds, isCollectOperation, collectQueryRequiresLabels, COLLECT_QUERIES } from './operation-metadata'
 import type { ArgBounds } from './operation-metadata'
 import { ArgSlots } from './ArgSlots'
 import type { ArgSlotRow } from './ArgSlots'
@@ -55,6 +55,10 @@ export function FormulaBuilder({ initial, initialConstants, atoms, saving, onSav
     const raw = initialConstants['labels']
     return Array.isArray(raw) ? raw.filter((l): l is string => typeof l === 'string') : []
   })
+  // Uncommitted chip-editor text (the DetailPanel creation-form pattern). A chip only exists
+  // after Enter, so a user who typed a label and clicked Save formula would otherwise ship
+  // `labels: []` — which COLLECT reads as "every atom", not "none" (ADR-260027 D2).
+  const [labelDraft, setLabelDraft] = useState('')
   const [entries, setEntries] = useState<ConstantEntry[]>(() =>
     Object.entries(initialConstants)
       .filter(([key]) => key !== 'labels')
@@ -69,10 +73,18 @@ export function FormulaBuilder({ initial, initialConstants, atoms, saving, onSav
   const constantKeys = [...new Set(entries.map((e) => e.key.trim()).filter((k) => k !== ''))]
   const queryName = collectChoice === OTHER_QUERY ? customQuery.trim() : collectChoice
 
+  // What the save would actually send: committed chips plus any typed-but-uncommitted text.
+  const pendingLabel = labelDraft.trim()
+  const effectiveLabels = pendingLabel && !labels.includes(pendingLabel) ? [...labels, pendingLabel] : labels
+
   // Save gating with a reason (never a silently dead button). Arity minimums are enforced
   // structurally — rows are padded to min — so an unmet arity shows up as an empty slot.
   const blockReason = collect
-    ? (queryName === '' ? 'Enter the collect query name.' : null)
+    ? queryName === ''
+      ? 'Enter the collect query name.'
+      : collectQueryRequiresLabels(queryName) && effectiveLabels.length === 0
+        ? 'Add at least one label — this query would otherwise collect every atom you own.'
+        : null
     : rows.some((r) => r.value === '')
       ? 'Fill every argument slot.'
       : rows.some((r) => r.source === 'constant' && !constantKeys.includes(r.value))
@@ -86,7 +98,7 @@ export function FormulaBuilder({ initial, initialConstants, atoms, saving, onSav
 
   function save() {
     if (collect) {
-      onSave({ name, args: [queryName] }, { labels })
+      onSave({ name, args: [queryName] }, { labels: effectiveLabels })
       return
     }
     const constants: Record<string, unknown> = {}
@@ -154,6 +166,7 @@ export function FormulaBuilder({ initial, initialConstants, atoms, saving, onSav
               ariaLabel="Collect labels"
               onAdd={(label) => setLabels((prev) => [...prev, label])}
               onRemove={(label) => setLabels((prev) => prev.filter((l) => l !== label))}
+              onDraftChange={setLabelDraft}
             />
           </div>
         </div>

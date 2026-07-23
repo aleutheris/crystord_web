@@ -26,8 +26,35 @@ export const BUILTIN_OPERATIONS: Record<string, BuiltinOperation> = {
   COLLECT: { min: 1, max: 1, collect: true },
 }
 
-/** Registered COLLECT query names (label-only until the backend adds category collect). */
-export const COLLECT_QUERIES: readonly string[] = ['atoms_with_labels']
+/**
+ * Registered COLLECT queries and the constants each one requires (label-only until the backend
+ * adds category collect). Same client-side-table compromise as `BUILTIN_OPERATIONS` above:
+ * `discoverOperations` exposes no constants metadata, so the builder carries the requirement.
+ *
+ * `requiresLabels` is a correctness gate, not a convenience check. `atoms_with_labels` ANDs the
+ * requested labels, and an empty list is vacuously true server-side — it matches EVERY atom the
+ * caller owns rather than none. An unenforced empty `labels` therefore silently writes a
+ * collect-everything result, so the builder must refuse the save (ADR-260027 D2 rationale).
+ */
+interface CollectQuerySpec {
+  name: string
+  requiresLabels: boolean
+}
+
+const COLLECT_QUERY_SPECS: readonly CollectQuerySpec[] = [
+  { name: 'atoms_with_labels', requiresLabels: true },
+]
+
+/** Registered COLLECT query names. */
+export const COLLECT_QUERIES: readonly string[] = COLLECT_QUERY_SPECS.map((q) => q.name)
+
+/**
+ * Whether the query cannot run without at least one label. Unregistered (free-text) queries
+ * return `false` — we only know the requirements of queries we ship in the table.
+ */
+export function collectQueryRequiresLabels(name: string): boolean {
+  return COLLECT_QUERY_SPECS.find((q) => q.name === name)?.requiresLabels ?? false
+}
 
 /** Arg bounds for an operation; unknown names get the generic variadic fallback. */
 export function argBounds(name: string): ArgBounds {
