@@ -18,8 +18,16 @@ describe('CategoryTree', () => {
   it('renders node display names and counts, children hidden when collapsed', () => {
     render(<CategoryTree nodes={NODES} expandedKeys={[]} onToggle={vi.fn()} />)
     expect(screen.getByText('Region')).toBeInTheDocument()
-    expect(screen.getByText('5')).toBeInTheDocument()
+    expect(screen.getByText('(5)')).toBeInTheDocument()
     expect(screen.queryByText('Belgium')).not.toBeInTheDocument()
+  })
+
+  it('renders a zero atom count as its own "(0)" badge, not glued onto the display name', () => {
+    const nodes: CategoryTreeNode[] = [{ key: 'brand/tesla', displayName: 'Tesla', atomCount: 0 }]
+    render(<CategoryTree nodes={nodes} expandedKeys={[]} onToggle={vi.fn()} />)
+    expect(screen.getByText('Tesla')).toBeInTheDocument()
+    expect(screen.getByText('(0)')).toBeInTheDocument()
+    expect(screen.queryByText('Tesla0')).not.toBeInTheDocument()
   })
 
   it('toggling fires onToggle with the node key', async () => {

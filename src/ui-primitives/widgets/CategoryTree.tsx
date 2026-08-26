@@ -10,6 +10,11 @@ import type { CategoryTreeProps, CategoryTreeNode, CategoryTreeClassNames } from
  * Every action is a native `<button>`, so the tree is fully keyboard-operable today. The formal
  * ARIA tree keyboard pattern (roving focus + arrow-key navigation) is completed by EPIC-260068
  * when it wires real data and focus management.
+ *
+ * The count badge renders as `(N)`, not a bare number (LRN-004): "style-neutral" only covers
+ * color/spacing, not a bare trailing digit reading as part of the name (worst at `atomCount: 0`,
+ * a brand-new value's default) — that's ambiguous regardless of CSS, so it's fixed in markup here
+ * rather than left to callers, neither of which supplied `classNames.count` anyway.
  */
 export function CategoryTree({
   nodes,
@@ -70,7 +75,9 @@ function CategoryTreeItem({ node, expandedKeys, onToggle, onSelect, canEditNode,
         )}
         <button type="button" className={classNames?.select} onClick={() => onSelect?.(node)}>
           <span className={classNames?.label}>{node.displayName}</span>
-          {node.atomCount !== undefined && <span className={classNames?.count}>{node.atomCount}</span>}
+          {node.atomCount !== undefined && (
+            <span className={classNames?.count}>{' '}({node.atomCount})</span>
+          )}
         </button>
         {showEdit && (
           <button type="button" className={classNames?.edit} aria-label={`Edit ${node.displayName}`} onClick={() => onEditNode!(node)}>
