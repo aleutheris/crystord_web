@@ -127,8 +127,8 @@ describe('atomsToFlowEdges', () => {
     ]
     const edges = atomsToFlowEdges(atoms, eligibleBonds)
     expect(edges).toHaveLength(1)
-    expect(edges[0]!.source).toBe('a1')
-    expect(edges[0]!.target).toBe('a2')
+    expect(edges[0]!.source).toBe('a2')
+    expect(edges[0]!.target).toBe('a1')
   })
 
   it('renders edges with arrowhead marker (REQ-FR-260046)', () => {
@@ -191,13 +191,13 @@ describe('mergeNodePositions', () => {
   })
 })
 
-describe('cycleEdgeKeys (ADR-260065 / EPIC-260069)', () => {
-  it('collects from->to keys across all atoms reporting cycle edges', () => {
+describe('cycleEdgeKeys (ADR-260065 / EPIC-260069; inverted to->from per ADR-260072)', () => {
+  it('collects to->from keys across all atoms reporting cycle edges', () => {
     const a1: Atom = { ...makeAtom('a1', 'Alpha'), cycleEdges: [{ from: 'a1', to: 'a2' }] }
     const a2: Atom = { ...makeAtom('a2', 'Beta'), cycleEdges: [{ from: 'a2', to: 'a1' }, { from: 'a1', to: 'a2' }] }
     const keys = cycleEdgeKeys([a1, a2, makeAtom('a3', 'Gamma')])
 
-    expect(keys).toEqual(new Set(['a1->a2', 'a2->a1']))
+    expect(keys).toEqual(new Set(['a2->a1', 'a1->a2']))
   })
 
   it('is empty when no atom reports cycle edges (absent or null field)', () => {

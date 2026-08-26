@@ -60,16 +60,20 @@ export function atomsToNetworkEdges(atoms: Atom[]): Edge[] {
 
 // Produces Flow-view edges filtered to the eligible-bond allowlist.
 // Labels are suppressed for readability; label seam retained via atomsToEdges base data (D5 / ADR-260039).
+// Edge direction is inverted relative to the raw bond pointer (ADR-260072): a bond with
+// direction 'from' on `atom` means "atom depends on bond.uuid", but Flow view visualizes
+// value flow, not the dependency reference — so the dependency (bond.uuid) is the edge
+// source and the dependent atom is the edge target.
 export function atomsToFlowEdges(atoms: Atom[], eligibleBonds: ReadonlySet<string>): Edge[] {
   const edges: Edge[] = []
   for (const atom of atoms) {
-    const sourceId = atom.properties.shellies.uuid
+    const dependentId = atom.properties.shellies.uuid
     for (const bond of atom.bonds) {
       if (bond.direction === 'from' && eligibleBonds.has(bond.name)) {
         edges.push({
-          id: `${sourceId}-${bond.uuid}-${bond.name}`,
-          source: sourceId,
-          target: bond.uuid,
+          id: `${dependentId}-${bond.uuid}-${bond.name}`,
+          source: bond.uuid,
+          target: dependentId,
           label: undefined,
           markerEnd: { type: MarkerType.ArrowClosed },
         })
@@ -80,14 +84,17 @@ export function atomsToFlowEdges(atoms: Atom[], eligibleBonds: ReadonlySet<strin
 }
 
 /**
- * Collects every reported cycle edge across the atoms into `from->to` keys
- * (ADR-260065 / EPIC-260069 — `cycleEdges` rides on each affected atom).
+ * Collects every reported cycle edge across the atoms into `to->from` keys, matching
+ * atomsToFlowEdges' inverted (dependency -> dependent) direction (ADR-260072), so cycle
+ * styling still lines up with the edges actually rendered in Flow view. The backend reports
+ * `cycleEdges` as `{from, to}` in the raw dependency-pointer direction (ADR-260065 / EPIC-260069
+ * — `cycleEdges` rides on each affected atom); the key is built as `to->from` here to invert it.
  */
 export function cycleEdgeKeys(atoms: Atom[]): Set<string> {
   const keys = new Set<string>()
   for (const atom of atoms) {
     for (const pair of atom.cycleEdges ?? []) {
-      keys.add(`${pair.from}->${pair.to}`)
+      keys.add(`${pair.to}->${pair.from}`)
     }
   }
   return keys
