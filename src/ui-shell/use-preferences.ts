@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 
 export type HomeEmphasis = 'compute' | 'relationship'
 export type ComputeBadges = 'always' | 'onDemand'
@@ -26,21 +26,47 @@ export interface WorkspacePreferences {
   computeBadges: ComputeBadges
   leftRailCollapsed: boolean
   rightRailCollapsed: boolean
+  leftRailWidth: number
   setHomeEmphasis: (value: HomeEmphasis) => void
   setComputeBadges: (value: ComputeBadges) => void
   setLeftRailCollapsed: (value: boolean) => void
   setRightRailCollapsed: (value: boolean) => void
+  setLeftRailWidth: (value: number) => void
 }
 
 export const DEFAULT_HOME_EMPHASIS: HomeEmphasis = 'compute'
 export const DEFAULT_COMPUTE_BADGES: ComputeBadges = 'always'
 export const DEFAULT_LEFT_RAIL_COLLAPSED = false
 export const DEFAULT_RIGHT_RAIL_COLLAPSED = false
+export const DEFAULT_LEFT_RAIL_WIDTH = 240
+export const LEFT_RAIL_MIN_WIDTH = 200
+export const LEFT_RAIL_MAX_WIDTH = 480
 
 const HOME_EMPHASIS_KEY = 'crystord-home-emphasis'
 const COMPUTE_BADGES_KEY = 'crystord-compute-badges'
 const LEFT_RAIL_COLLAPSED_KEY = 'crystord-left-rail-collapsed'
 const RIGHT_RAIL_COLLAPSED_KEY = 'crystord-right-rail-collapsed'
+const LEFT_RAIL_WIDTH_KEY = 'crystord-left-rail-width'
+
+/**
+ * The viewport-capped effective maximum: 60% of the viewport, floored at LEFT_RAIL_MIN_WIDTH and
+ * ceilinged at LEFT_RAIL_MAX_WIDTH (EPIC-260077 / ADR-260073). Exposed so callers that need
+ * "what's the real max right now" (aria-valuemax, the End key) read the same number
+ * `clampLeftRailWidth` enforces, instead of hand-duplicating the formula against the fixed
+ * `LEFT_RAIL_MAX_WIDTH` constant.
+ */
+export function getLeftRailEffectiveMaxWidth(viewportWidth: number): number {
+  return Math.max(LEFT_RAIL_MIN_WIDTH, Math.min(LEFT_RAIL_MAX_WIDTH, viewportWidth * 0.6))
+}
+
+/**
+ * Bounds a candidate rail width to [MIN, effective max] (EPIC-260077 / ADR-260073). The single
+ * source of truth for validity — read, drag, keyboard-step, and reset all funnel through this so
+ * they cannot disagree on what width is allowed.
+ */
+export function clampLeftRailWidth(width: number, viewportWidth: number): number {
+  return Math.min(Math.max(width, LEFT_RAIL_MIN_WIDTH), getLeftRailEffectiveMaxWidth(viewportWidth))
+}
 
 function readHomeEmphasis(): HomeEmphasis {
   try {
@@ -80,11 +106,27 @@ function readRightRailCollapsed(): boolean {
   return DEFAULT_RIGHT_RAIL_COLLAPSED
 }
 
+function readLeftRailWidth(): number {
+  try {
+    const stored = localStorage.getItem(LEFT_RAIL_WIDTH_KEY)
+    const parsed = stored === null || stored.trim() === '' ? NaN : Number(stored)
+    if (Number.isFinite(parsed)) return clampLeftRailWidth(parsed, window.innerWidth)
+  } catch {
+    // localStorage unavailable
+  }
+  return clampLeftRailWidth(DEFAULT_LEFT_RAIL_WIDTH, window.innerWidth)
+}
+
 export function usePreferences(): WorkspacePreferences {
   const [homeEmphasis, setHomeEmphasis] = useState<HomeEmphasis>(readHomeEmphasis)
   const [computeBadges, setComputeBadges] = useState<ComputeBadges>(readComputeBadges)
   const [leftRailCollapsed, setLeftRailCollapsed] = useState<boolean>(readLeftRailCollapsed)
   const [rightRailCollapsed, setRightRailCollapsed] = useState<boolean>(readRightRailCollapsed)
+  const [leftRailWidth, setLeftRailWidthRaw] = useState<number>(readLeftRailWidth)
+  const setLeftRailWidth = useCallback(
+    (value: number) => setLeftRailWidthRaw(clampLeftRailWidth(value, window.innerWidth)),
+    [],
+  )
 
   useEffect(() => {
     try {
@@ -118,8 +160,27 @@ export function usePreferences(): WorkspacePreferences {
     }
   }, [rightRailCollapsed])
 
+  useEffect(() => {
+    try {
+      localStorage.setItem(LEFT_RAIL_WIDTH_KEY, String(leftRailWidth))
+    } catch {
+      // localStorage unavailable
+    }
+  }, [leftRailWidth])
+
   return useMemo(
-    () => ({ homeEmphasis, computeBadges, leftRailCollapsed, rightRailCollapsed, setHomeEmphasis, setComputeBadges, setLeftRailCollapsed, setRightRailCollapsed }),
-    [homeEmphasis, computeBadges, leftRailCollapsed, rightRailCollapsed],
+    () => ({
+      homeEmphasis,
+      computeBadges,
+      leftRailCollapsed,
+      rightRailCollapsed,
+      leftRailWidth,
+      setHomeEmphasis,
+      setComputeBadges,
+      setLeftRailCollapsed,
+      setRightRailCollapsed,
+      setLeftRailWidth,
+    }),
+    [homeEmphasis, computeBadges, leftRailCollapsed, rightRailCollapsed, leftRailWidth, setLeftRailWidth],
   )
 }

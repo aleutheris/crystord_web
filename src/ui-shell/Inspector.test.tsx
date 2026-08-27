@@ -49,10 +49,12 @@ function provide(
       computeBadges: 'always',
       leftRailCollapsed: false,
       rightRailCollapsed: opts.rightRailCollapsed ?? false,
+      leftRailWidth: 240,
       setHomeEmphasis: vi.fn(),
       setComputeBadges: vi.fn(),
       setLeftRailCollapsed: vi.fn(),
       setRightRailCollapsed: opts.setRightRailCollapsed ?? vi.fn(),
+      setLeftRailWidth: vi.fn(),
     },
   }
 }

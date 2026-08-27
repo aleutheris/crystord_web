@@ -17,10 +17,12 @@ const value: WorkspaceContextValue = {
     computeBadges: 'always',
     leftRailCollapsed: false,
     rightRailCollapsed: false,
+    leftRailWidth: 240,
     setHomeEmphasis: vi.fn(),
     setComputeBadges: vi.fn(),
     setLeftRailCollapsed: vi.fn(),
     setRightRailCollapsed: vi.fn(),
+    setLeftRailWidth: vi.fn(),
   },
 }
 
