@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { navigators } from './slots'
 import { useWorkspace } from './workspace-context'
-import { DEFAULT_LEFT_RAIL_WIDTH, LEFT_RAIL_MIN_WIDTH, clampLeftRailWidth, getLeftRailEffectiveMaxWidth } from './use-preferences'
+import { DEFAULT_LEFT_RAIL_WIDTH, LEFT_RAIL_MAX_WIDTH, LEFT_RAIL_MIN_WIDTH, clampLeftRailWidth, getLeftRailEffectiveMaxWidth } from './use-preferences'
 import { C_BORDER, C_PRIMARY, C_SURFACE, C_TEXT_SECONDARY } from '../styles/tokens'
 
 export const RESIZE_STEP = 16
@@ -122,7 +122,19 @@ export function LeftRail() {
   return (
     <aside
       aria-label="Explorer"
-      style={{ position: 'relative', flexShrink: 0, width: railWidth, borderRight: `1px solid ${C_BORDER}`, background: C_SURFACE, display: 'flex', flexDirection: 'column' }}
+      style={{
+        position: 'relative',
+        flexShrink: 0,
+        width: railWidth,
+        // Continuously re-caps the rendered width on a bare viewport resize with zero JS (no
+        // `window.resize` listener) — ADR-260074. The `60vw` here must stay in sync with the
+        // `0.6` factor in `getLeftRailEffectiveMaxWidth`; nothing enforces that automatically.
+        maxWidth: `min(${LEFT_RAIL_MAX_WIDTH}px, 60vw)`,
+        borderRight: `1px solid ${C_BORDER}`,
+        background: C_SURFACE,
+        display: 'flex',
+        flexDirection: 'column',
+      }}
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.4rem 0.6rem', borderBottom: `1px solid ${C_BORDER}` }}>
         <span style={{ fontWeight: 600, fontSize: '0.8rem', color: C_TEXT_SECONDARY }}>{activeNavigator?.label ?? 'Explorer'}</span>

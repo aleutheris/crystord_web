@@ -178,6 +178,12 @@ describe('LeftRail resize handle (EPIC-260077 / ADR-260073)', () => {
     expect(setLeftRailWidth).toHaveBeenCalledWith(DEFAULT_LEFT_RAIL_WIDTH)
   })
 
+  it('the rail carries a CSS maxWidth cap so a bare viewport resize stays capped without JS (ADR-260074)', () => {
+    render(<WorkspaceProvider value={provide(false, vi.fn(), vi.fn(), 300)}><LeftRail /></WorkspaceProvider>)
+    const aside = screen.getByRole('complementary', { name: 'Explorer' })
+    expect(aside).toHaveStyle({ maxWidth: `min(${LEFT_RAIL_MAX_WIDTH}px, 60vw)` })
+  })
+
   it('aria-valuemax reflects the viewport-capped effective maximum on a narrow viewport', () => {
     const originalInnerWidth = window.innerWidth
     Object.defineProperty(window, 'innerWidth', { value: 600, configurable: true })
