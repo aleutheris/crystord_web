@@ -16,7 +16,8 @@ The `.tgz` contains a single top-level directory with:
 
 - `crystord_server/schema.graphql` — backend GraphQL schema snapshot
 - `docs/user-guide.md`
-- `.github/project/evolution/contracts/schema-compatibility-contract.md`
+- `docs/governance/project/evolution/contracts/schema-compatibility-contract.md`
+  (bundles up to v6.0.0 shipped this under `.github/project/evolution/contracts/`)
 - `manifest.json` — `schemaVersion`, `schemaHash`, `releasedAt`, and a per-file
   `sha256`/`sizeBytes` list
 
@@ -36,7 +37,17 @@ with the bundle's own `verify.py` against a range derived from its major version
 
 - `crystord_server/schema.graphql` → `docs/crystord_server/schema.graphql`
 - `docs/user-guide.md` → `docs/user-guide.md`
-- `.github/.../schema-compatibility-contract.md` → `docs/contracts/schema-compatibility-contract.md`
+- `docs/governance/.../schema-compatibility-contract.md` → same path at the project
+  root, i.e. it lands **on top of** this project's own governed contract record
+  (`docs/governance/project/evolution/contracts/schema-compatibility-contract.md`,
+  registered in `contract-index.md`). Bundles up to v6.0.0 used the `.github/`
+  layout and were remapped to `docs/contracts/` instead — the copy still sitting
+  there is a stale orphan of that older layout.
+
+Note the `--supported-range` printed in a bundle's `README-HANDOFF.txt` is stale
+boilerplate (`^3.0.0` in every bundle since v4.0.0) and will report
+`Compatible: no`. The installer ignores it and derives `^MAJOR.0.0` from the
+bundle itself; use the installer rather than the handoff command.
 
 The same newest-bundle verification runs automatically as a preflight in
 `tools/run_tests.py`.

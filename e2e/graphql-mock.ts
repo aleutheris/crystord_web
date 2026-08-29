@@ -12,11 +12,11 @@
 import type { Page, Route } from '@playwright/test'
 import { escapeLog } from './fixtures'
 
-/** Matches the schema range the app validates against (`~9.2.0`). */
+/** Matches the schema range the app validates against (`~9.3.0`, ICR-260093). */
 export const SCHEMA_INFO = {
-  schemaVersion: '9.2.0',
-  schemaHash: '6e1c4572d4a6d485702dc8a3c46491d51b8fc1fb34c032474f4e54e8a4ba01b8',
-  releasedAt: '2026-05-27T00:00:00Z',
+  schemaVersion: '9.3.0',
+  schemaHash: 'ae7b6ef6d0823fc3dd716fa845f6fd52108f6cbf75aafdd2c049defcb01fa5a0',
+  releasedAt: '2026-08-25T00:00:00Z',
 }
 
 /** Fulfill a GraphQL route with a `data` payload. */

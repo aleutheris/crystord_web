@@ -1,6 +1,6 @@
 # Crystord User Guide
 
-> **Schema version: `9.2.0`** (released 2026-06-25). This guide matches the live GraphQL schema
+> **Schema version: `9.3.0`** (released 2026-08-25). This guide matches the live GraphQL schema
 > exactly (`crystord_server/schema.graphql`). Always confirm the version your deployment serves with
 > the `schemaInfo` query before relying on a contract detail.
 
@@ -176,8 +176,8 @@ Authorization: Bearer <your-session-token>
 Every operation is authorized centrally. There are two outcomes a client must handle:
 
 - **Public operations** (no token needed): `signin`, `signinGoogle`, `schemaInfo`,
-  `discoverOperations`, `beginSignup`, `completeSignup`, `requestPasswordReset`,
-  `confirmPasswordReset`, `logout`.
+  `discoverOperations`, `collectQueries`, `beginSignup`, `completeSignup`,
+  `requestPasswordReset`, `confirmPasswordReset`, `logout`.
 - **Everything else requires a valid Bearer session token.** Calling a gated operation without a
   valid token returns a GraphQL error with code `AUTHZ-AUTHENTICATION-REQUIRED`.
 
@@ -206,7 +206,8 @@ Every operation is authorized centrally. There are two outcomes a client must ha
 | `schemaInfo` | Query | Public | Schema version, hash, and release date for compatibility checks |
 | `retrieve` | Query | Auth | Read Atoms by UUID, by labels, and/or by category |
 | `listLabels` | Query | Auth | List available labels starting with a prefix |
-| `discoverOperations` | Query | Public | Discover callable operation functions |
+| `discoverOperations` | Query | Public | Discover callable operation functions and their argument contract |
+| `collectQueries` | Query | Public | Discover the whitelisted `COLLECT` queries and the constants each requires |
 | `change` | Mutation | Auth | Create new Atoms or update existing ones |
 | `destroy` | Mutation | Auth | Delete Atoms |
 | `shareAtom` / `revokeAtomAccess` | Mutation | Auth | Grant/revoke access to an atom (by username or workspace key) |
@@ -223,7 +224,7 @@ Every operation is authorized centrally. There are two outcomes a client must ha
 
 ### Public GraphQL Contract (Complete)
 
-This section is the complete user-facing contract for schema `9.2.0`. Every operation that requires
+This section is the complete user-facing contract for schema `9.3.0`. Every operation that requires
 a token is marked **Auth required**; everything else is public.
 
 #### Queries
@@ -247,6 +248,13 @@ a token is marked **Auth required**; everything else is public.
   - Public. Returns `schemaVersion`, `schemaHash`, and `releasedAt`.
 - `discoverOperations(prefix: String, limit: Int): [OperationFunction!]!`
   - Public. `limit` is optional; backend caps the effective limit at 100.
+  - Each `OperationFunction` carries `name`, `description`, and the function's argument contract:
+    `minArity`, `maxArity` (null = no upper bound), `numericOnly`.
+- `collectQueries: [CollectQueryInfo!]!`
+  - Public. The whitelisted `COLLECT` queries: `name` (the value of `COLLECT`'s single argument),
+    `description`, and `constants` — the required `constants` keys, each as
+    `{ key, type, minItems }` (`minItems` is null unless the type is a list). Derived from the
+    server's registry, so it is always current; the Cypher behind a query is never published.
 - `listAtomGrants(atomUuid: ID!): [AtomGrantOutput!]!`
   - Auth required. Owner-only. Lists the direct access grants on an atom.
 - `listMyWorkspaces: [WorkspaceOutput!]!`
@@ -399,7 +407,10 @@ The `principal` is a **username** (`USER`) or **workspace key** (`WORKSPACE`); a
   - `shellies: ShelliesInput` (`uuid` input only)
   - `nuclearies: NucleariesInput`
 - `NucleariesInput`
-  - `title`, `description`, `operation`, `constants`
+  - `title`, `description`, `operation`
+  - `constants: JSON` — a JSON **object** (`{ taxRate: 0.21 }`) is the canonical form; a
+    JSON-encoded string of that object is accepted but discouraged. See
+    [`constants` encoding](#constants-encoding-object-form-is-canonical).
   - `content: JSON` — accepts a string, number, JSON array (list atom), or null
   - `declaredType` (typed declaration input)
   - `typeMode` (`flexible` or `strict`)
@@ -468,6 +479,10 @@ The `principal` is a **username** (`USER`) or **workspace key** (`WORKSPACE`); a
 - Canonical function-style operation payloads are supported by runtime behavior and are serialized at the boundary as string values.
 - `OP_DEPENDENCY` bonds are system-managed; clients should not submit them directly.
 - `change` requires `labels` in each input object, including update payloads.
+- `constants` is a `JSON` scalar whose canonical encoding is the JSON object; on update a present
+  `constants` replaces the stored map as a whole (FR-3 §AU-1). Operands in `operation` resolve
+  UUID-first, then as a constants key. See
+  [When To Use `operation` and `constants`](#when-to-use-operation-and-constants).
 
 ---
 
@@ -752,15 +767,39 @@ query {
   discoverOperations(prefix: "S", limit: 10) {
     name
     description
+    minArity
+    maxArity
+    numericOnly
   }
 }
 ```
 
-Use this to build operation authoring UX (for example, type-ahead pickers).
+Use this to build operation authoring UX (for example, type-ahead pickers), and to reject a
+malformed operation client-side — a wrong argument count, or a non-numeric argument to a
+`numericOnly` function — before sending it.
 
 Notes:
 - `prefix` is optional. If omitted, all user-visible functions are returned.
 - `limit` is optional. Server-side max limit is 100.
+- `maxArity` is null for functions with no upper bound on their argument count (e.g. `SUM`).
+
+### Discover the COLLECT queries
+
+```graphql
+query {
+  collectQueries {
+    name
+    description
+    constants { key type minItems }
+  }
+}
+```
+
+Returns every query `COLLECT` accepts, with the `constants` keys each requires, their declared
+type (`string` or `list[string]`) and, for list types, the minimum item count. `description` is
+the query's own documentation, written in this guide's terms and suitable for display as-is. The
+list is derived from the server's registry, so a newly registered query appears here the day it
+ships. See [COLLECT](#collect) for the queries themselves.
 
 ---
 
@@ -870,6 +909,32 @@ mutation {
 This is the standard way to change the title, description, content, or relationships of an existing Atom.
 
 > Note: in the GraphQL schema, each `AtomInput` requires `labels`, so include them in your update payload.
+
+### Field-level replace semantics
+
+An update **replaces** every field it carries and **leaves unchanged** every field it omits — there
+is no merge (FR-3 §AU-1). This matters most for `constants`, which is a map:
+
+- `constants` **present** → the stored map is replaced by the supplied one **as a whole**. To change
+  one key, resend the entire map with that key changed; a map that omits a key removes that key.
+- `constants: {}` → the map is cleared.
+- `constants` **omitted** → the stored map is untouched.
+
+```graphql
+# Replace the whole constants map (keeps operation, title, etc. unchanged)
+mutation {
+  change(
+    selector: { uuid: "1c7b2b3d-1111-2222-3333-444455556666" }
+    inputs: [{ labels: ["Project"], properties: { nuclearies: { constants: { taxRate: 0.19 } } } }]
+  )
+}
+```
+
+Whenever an update carries `operation` or `constants`, the operation that will be stored is
+re-checked against the constants that will be stored — before anything is written. A constants-only
+update that drops a key the stored operation still references is therefore rejected with
+`OP-ENC-OPERAND-INVALID` (see [How operands resolve](#how-operands-resolve-uuid-first-then-constants-key)).
+`bonds` and `categories` follow the same present-replaces / omitted-keeps rule.
 
 ---
 
@@ -1061,6 +1126,75 @@ mutation { transferCategoryValueOwnership(key: "mercedes", toUsername: "other.us
 
 ---
 
+## Cell Types (List Content)
+
+A list atom's `content` is a JSON array of **cells**. What a cell may contain is fixed by the
+content-representation rules (the `CT-` rules of ADR-260034, as amended by ADR-260040). The ones an
+API client needs are below.
+
+### CT-5: the three cell forms
+
+| Cell form | Encoding | Example |
+|---|---|---|
+| Literal | a raw JSON scalar — number, string (not in UUID format), boolean, or `null` | `3`, `"hello"`, `true`, `null` |
+| Reference | `{"ref": "<uuid>"}` | `{"ref": "1c7b2b3d-1111-2222-3333-444455556666"}` |
+| Nested list | a JSON array whose elements are themselves valid cells | `[1, {"ref": "…"}, [2, 3]]` |
+
+- A **reference cell** means "the content of that atom" — and it is dereferenced only when the list
+  is **consumed as an operand** by an operation (`SUM` and the other callables). At that point the
+  evaluator replaces each `{"ref": …}` with the referenced atom's content, fetching the target
+  lazily if the initial read did not include it. That fetch resolves **only atoms you own** —
+  `EDITOR` or `VIEWER` access granted through sharing is not enough. A reference that cannot be
+  resolved (an unknown or deleted UUID, or an atom you do not own) is expanded as `null`, and no
+  reference-specific error is raised; a numeric consumer such as `SUM` then fails with
+  `OP-OPERAND-TYPE-MISMATCH` (`evaluationStatus: "failed-origin"`, see
+  [Evaluation Contract](#computed-atoms--evaluation-contract)). The response carries only that
+  code — nothing in it identifies which reference cell failed to resolve. A reference cell should
+  therefore name your own atoms. A plain `retrieve` of the list atom returns its reference cells
+  exactly as stored, unexpanded.
+- Reference cells create **no bonds**. System-managed `OP_DEPENDENCY` bonds are derived from an
+  atom's `operation` operands, never from the cells in its content, so a referenced atom is not a
+  dependency of the list that names it — it is fetched at evaluation time by whichever operation
+  consumes the list.
+- A **bare UUID string is not a valid cell** at any nesting level. List content that carries one
+  is rejected before anything is written — with `AU-TYPE-MISMATCH` when the `change` has no
+  selector (creation), and with `AU-TYPE-CONFLICT` when the `change` has a selector (update). It
+  is never read as a reference, and it is not accepted as a string literal either — only the
+  `{"ref": …}` object form refers to an atom.
+- The three-form rule applies recursively: a nested list cell follows it at every level, and there
+  is no nesting-depth cap.
+
+**How `COLLECT` produces reference cells.** A `COLLECT` atom's content is not entered by you: at
+evaluation time the whitelisted query runs and the atom's content becomes a list of reference
+cells, one `{"ref": "<uuid>"}` per matching atom (never a bare UUID string). From then on it is an
+ordinary CT-5 list — a consumer such as `SUM` expands the references exactly as it would for a list
+you wrote by hand. The list reflects the database at that moment; nothing invalidates it when
+matching atoms later change (see [COLLECT](#collect)).
+
+### CT-2 / CT-3: there is no table type
+
+Multidimensional data is a list atom whose cells are themselves lists — `declaredType: "list"` with
+content such as `[[1, 2], [3, 4]]`. There is no `table` content type, no table `declaredType`, and no
+canonical table structure: the earlier list/table distinction (CT-2) and internal table structure
+(CT-3) are retired (ADR-260040 §1) and must not be relied on. Operations handle nested lists through
+their own shape rules — see [SUM](#sum).
+
+### CT-12: lists are stored, not searched
+
+List content is stored as one serialized JSON value. No element is projected into a separate
+property or index, so nothing looks *inside* a list: `retrieve` filters by UUID, labels, and
+categories only, and the `COLLECT` queries match atoms by their labels and category assignments,
+never by their cells. Querying inside cell values is out of scope for the current release.
+
+### Operations declare no return cell type
+
+`discoverOperations` publishes a function's argument contract (`minArity`, `maxArity`,
+`numericOnly`), not the type of its result. The result's *shape* follows the operation's own shape
+rules (the [SUM](#sum) table), and `COLLECT` always yields a list of reference cells — but there is
+no per-operation "return type" field in v1. Do not infer one from the catalog.
+
+---
+
 ## Operations Reference
 
 This section documents every callable function available in Crystord.
@@ -1164,21 +1298,26 @@ DIVIDE(profit_uuid, revenue_uuid)       → 0.25    (profit=250, revenue=1000)
 
 ### COLLECT
 
-Queries the database at evaluation time and returns a list of atom references as CT-5 ref cells (`{"ref": "<uuid>"}`). Unlike the arithmetic operations, COLLECT does not compute over already-fetched atoms — it issues a database query and returns the matching set.
+Queries the database at evaluation time and returns a list of atom references as CT-5 reference cells (`{"ref": "<uuid>"}` — see [Cell Types](#cell-types-list-content)). Unlike the arithmetic operations, COLLECT does not compute over already-fetched atoms — it issues a database query and returns the matching set.
 
-**Arguments:** exactly one argument — the name of a registered query (a key in `crystord_server/collect_queries.json`).
+**Arguments:** exactly one argument — the name of a registered query (a key in `crystord_server/collect_queries.json`). It is a query name, not an atom UUID or a constants key: the [operand-resolution rules](#how-operands-resolve-uuid-first-then-constants-key) do not apply to it.
 
-**Parameters:** runtime values are supplied via the atom's `constants` map. Each registered query declares which `constants` keys it requires.
+**Parameters:** runtime values are supplied via the atom's `constants` map — as a JSON object, the canonical form (see [`constants` encoding](#constants-encoding-object-form-is-canonical)). Each registered query declares which `constants` keys it requires and their types. A required key that is absent fails the evaluation with `OP-COLLECT-CONSTANTS-MISSING`; one that is present but invalid — empty (`[]`, `{}`, `""`, `null`), of the wrong type, or below the declared minimum item count — fails with `OP-COLLECT-CONSTANTS-INVALID`. In both cases no query runs and no rows are returned — an empty filter never means "match everything". An unregistered query name fails with `OP-COLLECT-QUERY-UNKNOWN`.
 
 **Output:** a list of `{"ref": "<uuid>"}` cells. Consuming operations such as SUM expand these refs automatically.
 
 **Point-in-time semantics:** content reflects database state at the moment of evaluation. No live invalidation occurs when matching atoms are created, updated, or deleted.
 
-**Currently registered queries:**
+**Currently registered queries** (also published live by the `collectQueries` query, with each
+constant's declared type and minimum item count):
 
 | Query name | Required constants | Behaviour |
 |---|---|---|
 | `atoms_with_labels` | `labels` (list of strings) | Returns all atoms owned by the calling user that have **all** of the specified labels (AND semantics). |
+| `atoms_in_category_value` | `dimension_key`, `value_key` (strings) | Returns all atoms owned by the calling user categorized at **exactly** your own category value `value_key` in dimension `dimension_key` (see [Categories](#categories-dimensions--values-1)); atoms categorized only at that value's descendant values are excluded. A pair that does not resolve in your own taxonomy yields an empty list, not an error. |
+| `atoms_in_category_subtree` | `dimension_key`, `value_key` (strings) | Returns all atoms owned by the calling user categorized at your own category value `value_key` in dimension `dimension_key` **or at any of its descendant values** (deduplicated). A pair that does not resolve in your own taxonomy yields an empty list, not an error. |
+
+All three queries only ever return atoms you own; the category queries also only resolve values you own (the dimension is matched by key, so your own value under a shared dimension works too).
 
 **Examples:**
 
@@ -1188,6 +1327,12 @@ COLLECT(atoms_with_labels)  constants: {"labels": ["Invoice"]}
 
 COLLECT(atoms_with_labels)  constants: {"labels": ["Invoice", "2025"]}
 → atoms that have both Invoice AND 2025 labels
+
+COLLECT(atoms_in_category_value)    constants: {"dimension_key": "region", "value_key": "europe"}
+→ your atoms categorized at exactly europe (not at france, germany, … beneath it)
+
+COLLECT(atoms_in_category_subtree)  constants: {"dimension_key": "region", "value_key": "europe"}
+→ your atoms categorized at europe or at any value beneath it
 ```
 
 **Operation payload:**
@@ -1204,12 +1349,15 @@ mutation {
       nuclearies: {
         title: "Total invoiced"
         operation: "{\"name\": \"COLLECT\", \"args\": [\"atoms_with_labels\"]}"
-        constants: "{\"labels\": [\"Invoice\"]}"
+        constants: { labels: ["Invoice"] }
       }
     }
   }])
 }
 ```
+
+`operation` is a `String` field, so its JSON payload travels inside a string; `constants` is a
+`JSON` field, so the object is sent as-is.
 
 ---
 
@@ -1230,10 +1378,81 @@ Operation contract notes (current behavior):
 
 - `args` entries can be:
   - atom UUID references (resolved at evaluation time),
-  - constant keys resolved from `constants`.
+  - constant keys resolved from `constants` —
+    in that order of precedence; see [How operands resolve](#how-operands-resolve-uuid-first-then-constants-key).
 - Callable names are: `SUM`, `MINUS`, `PRODUCT`, `DIVIDE`, `COLLECT`.
 - If `operation` is cleared/empty, system-managed `OP_DEPENDENCY` bonds are removed/recomputed automatically.
 - Clients must not submit `OP_DEPENDENCY` bonds directly in `bonds`; these are system-managed.
+
+### How operands resolve (UUID first, then constants key)
+
+Every entry of `args` is a string, and the server decides what it means in a fixed order:
+
+1. **Does it match the UUID pattern** (`8-4-4-4-12` hexadecimal groups, e.g.
+   `1c7b2b3d-1111-2222-3333-444455556666`)? Then it is an **atom reference**: the referenced atom's
+   content is used at evaluation time.
+2. **Otherwise, is it a key of this atom's own `constants` map?** Then it is a **constant**: the
+   key's value is used.
+3. **Otherwise it is rejected at write time** with `OP-ENC-OPERAND-INVALID`. Variable names and
+   references to another atom's constants are never accepted.
+
+A numeric literal in `args` (`3`, `0.21`) is rejected with `OP-ENC-LITERAL-FORBIDDEN`: put the value
+in `constants` and reference it by key. The one exemption is `COLLECT`, whose single argument is a
+query name and is not resolved by these rules at all (see [COLLECT](#collect)). The checks run when
+the atom is created or updated, before anything is written, and re-run on any update that carries
+`operation` or `constants` (see [Field-level replace semantics](#field-level-replace-semantics)).
+
+> **The UUID-shaped-key trap.** Because the UUID test runs first, a `constants` key that itself
+> looks like a UUID can never be reached: an operand naming it is taken as a reference to an atom
+> with that UUID — resolved as that atom at evaluation, or failing as a missing dependency — and the
+> constant you defined is silently ignored, with no error at write time. Never name a constants
+> key in the UUID format; that shape is reserved for atom references, and a later release will
+> reject such keys at write time. A key that merely *resembles* a UUID (a different group length,
+> a non-hex character) is an ordinary key.
+
+### `constants` encoding: object form is canonical
+
+`constants` is a `JSON` field. Write it as a **JSON object** whose keys are the names you reference
+from `args`:
+
+```graphql
+nuclearies: {
+  operation: "{\"name\": \"SUM\", \"args\": [\"<atom-uuid>\", \"taxRate\"]}"
+  constants: { taxRate: 0.21 }
+}
+```
+
+`operation` is a `String` field, so its JSON stays inside a string; `constants` is not — send the
+object itself. A JSON object, sent in either form, comes back as an object on read.
+
+A JSON-encoded **string** of the same object (`constants: "{\"taxRate\": 0.21}"`) is still accepted
+for compatibility, but it is discouraged: it gains nothing, and it opens two failure modes the
+object form cannot have. Both come from the same fact — a string is stored **as sent**; it is not
+decoded, checked, or normalized on the way in.
+
+1. **A mis-reported write error.** If the string is not valid JSON, or decodes to something other
+   than an object, the write-time operand check reads it as an **empty map** — so every operand
+   that was meant to name a constants key is rejected as `OP-ENC-OPERAND-INVALID` ("not a valid
+   UUID and not a key in the atom's constants map"). The code describes an operand problem, but the
+   cause is the constants formatting: when you see it with a string-form `constants`, check that
+   the string is a well-formed JSON object before anything else.
+2. **A write that passes and a read that breaks.** When that check has no key operand to reject —
+   the atom has no `operation`, its operands are all UUIDs, or its operation is `COLLECT` (exempt
+   from the operand check: its one argument is a query name, and its parameters live entirely in
+   `constants`) — a malformed or non-object string is
+   neither rejected nor repaired: it is stored verbatim. A string that is valid JSON but not an
+   object (`"[1, 2]"`, `"42"`) then comes back on read as the list or number it decodes to, not as
+   an object. A string that is not valid JSON at all makes every `retrieve` whose result includes
+   that atom fail with a generic, uncoded error — not an `OP-ENC-*` code. Repair it with a `change`
+   that sends `constants` as an object (`{}` to clear).
+
+### `constants` on update: replace, never merge
+
+On `change` with a selector, a present `constants` replaces the stored map **as a whole** — the
+field-level replace semantics every updatable field follows (FR-3 §AU-1). Send the full map every
+time, `{}` to clear it, and omit the field to leave it unchanged. The stored operation is re-checked
+against the new map before the write. Details and an example:
+[Field-level replace semantics](#field-level-replace-semantics).
 
 If you do not need calculated behavior yet, it is fine to leave `operation` and `constants` empty.
 

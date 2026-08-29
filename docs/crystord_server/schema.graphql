@@ -15,6 +15,10 @@ type Query {
     listLabels(labelsPrefix: String!): [String!]!
     schemaInfo: SchemaInfo!
     discoverOperations(prefix: String, limit: Int): [OperationFunction!]!
+    # The whitelisted COLLECT queries with their required constants (ICR-260018) — derived from the
+    # server's registry, never hand-maintained. With OperationFunction's arity/type metadata this lets
+    # a client reject a malformed operation before sending it.
+    collectQueries: [CollectQueryInfo!]!
     listAtomGrants(atomUuid: ID!): [AtomGrantOutput!]!
     listMyWorkspaces: [WorkspaceOutput!]!
     listWorkspaceMembers(workspaceUuid: ID!): [WorkspaceMemberOutput!]!
@@ -73,6 +77,25 @@ type User {
 type OperationFunction {
     name: String!
     description: String
+    # Arity/type metadata (ICR-260018), read from the operation catalog: the accepted argument-count
+    # range (maxArity null = unbounded) and whether every argument must be numeric.
+    minArity: Int!
+    maxArity: Int
+    numericOnly: Boolean!
+}
+
+# A whitelisted COLLECT query (ICR-260018): its name — COLLECT's single argument — and the constants
+# keys it requires, each with its declared type and, for list types, the minimum item count.
+type CollectQueryInfo {
+    name: String!
+    description: String!
+    constants: [ConstantSpec!]!
+}
+
+type ConstantSpec {
+    key: String!
+    type: String!
+    minItems: Int
 }
 
 type Mutation {

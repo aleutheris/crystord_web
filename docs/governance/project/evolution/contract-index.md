@@ -7,7 +7,7 @@ contract status — load it before opening individual contract records.
 
 | ID | Title | Status | Record | Related | Notes |
 | --- | --- | --- | --- | --- | --- |
-| schema-compatibility-contract | Frontend/Backend GraphQL Schema Compatibility | Active | [schema-compatibility-contract.md](contracts/schema-compatibility-contract.md) | ADR-260013, ADR-260054, REQ-OR-260016, REQ-OR-260017, ICR-260001, ICR-260002 | Live pin `~9.2.0`, ratified by ICR-260002. Companion: `contracts/deprecation-log.md`. |
+| schema-compatibility-contract | Frontend/Backend GraphQL Schema Compatibility | Active | [schema-compatibility-contract.md](contracts/schema-compatibility-contract.md) | ADR-260013, ADR-260054, REQ-OR-260016, REQ-OR-260017, ICR-260001, ICR-260002, ICR-260081 | Live pin `~9.3.0`, ratified by ICR-260081. Companion: `contracts/deprecation-log.md`. |
 
 ## Tracking Rules
 

@@ -8,17 +8,17 @@
   "profiles": {
     "local": {
       "graphqlEndpoint": "http://localhost:5665/graphql",
-      "backendSchemaRange": "~9.2.0",
+      "backendSchemaRange": "~9.3.0",
       "oauthClient": "development"
     },
     "aleuhouse": {
       "graphqlEndpoint": "https://engine.crystord.com/api",
-      "backendSchemaRange": "~9.2.0",
+      "backendSchemaRange": "~9.3.0",
       "oauthClient": "production"
     },
     "nucubuntunl": {
       "graphqlEndpoint": "http://crystord:5665/graphql",
-      "backendSchemaRange": "~9.2.0",
+      "backendSchemaRange": "~9.3.0",
       "oauthClient": "development"
     }
   }

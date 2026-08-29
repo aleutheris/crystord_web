@@ -19,7 +19,7 @@ export const E2E_GRAPHQL_ENDPOINT = '/graphql'
 
 const E2E_RUNTIME_CONFIG = {
   graphqlEndpoint: E2E_GRAPHQL_ENDPOINT,
-  backendSchemaRange: '~9.2.0',
+  backendSchemaRange: '~9.3.0',
   googleClientId: 'e2e-google-client-id.apps.googleusercontent.com',
 }
 
