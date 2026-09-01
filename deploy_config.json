@@ -1,5 +1,5 @@
 {
-  "active": "nucubuntunl",
+  "active": "local",
   "deployProfile": "aleuhouse",
   "oauthClients": {
     "production": "175685736190-puvsu0n35eocvmmff1btvu1n4hj9f2uo.apps.googleusercontent.com",

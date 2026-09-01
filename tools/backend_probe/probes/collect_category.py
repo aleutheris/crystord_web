@@ -21,11 +21,11 @@ reports what the evaluator did with it. Three things are being observed:
 and destroys it before exiting; pass `--keep` to leave it in place for inspection in the
 UI. It never touches the taxonomy, only its own atom.
 
-Run:
-  CRYSTORD_PASSWORD_DEMO=... python3 tools/backend_probe/probes/collect_category.py \\
-      --dimension region --value europe
-  ... --query atoms_in_category_value --dimension region --value europe
-  ... --value europe --dimension region --keep
+Run (keys from category_taxonomy.py — the demo taxonomy has `brand` nested under
+`country`, so `country/germany` has brand descendants and is a real subtree test):
+  python3 tools/backend_probe/probes/collect_category.py --dimension country --value germany
+  ... --query atoms_in_category_value --dimension country --value germany
+  ... --dimension country --value germany --keep
 """
 
 from __future__ import annotations
@@ -63,6 +63,13 @@ mutation Destroy($uuid: String) {
 
 DEFAULT_QUERY = "atoms_in_category_subtree"
 
+# `change` rejects an atom with no labels: `labels: []` comes back as `AC-LABELS-EMPTY`
+# (observed 2026-09-01 against 9.3.0; the code appears NOWHERE in docs/user-guide.md, and
+# `AtomInput.labels` is only typed `[String!]!`, which a reader would satisfy with `[]`).
+# Not an app defect — the builder saves through an update that carries the atom's existing
+# labels — but it means a probe cannot create a bare computed atom.
+PROBE_LABEL = "backend_probe"
+
 
 def _create(session: Session, query_name: str, dimension: str, value: str) -> str:
     """Write the computed atom exactly as FormulaBuilder's save path would."""
@@ -75,7 +82,7 @@ def _create(session: Session, query_name: str, dimension: str, value: str) -> st
         CHANGE_MUTATION,
         {
             "inputs": [{
-                "labels": [],
+                "labels": [PROBE_LABEL],
                 "properties": {"nuclearies": {
                     "title": f"probe-collect-{query_name}",
                     "operation": operation,
@@ -105,6 +112,27 @@ def _destroy(session: Session, uuid: str) -> None:
         print(f"probe: CLEANUP FAILED for {uuid} — delete it by hand: {json.dumps(outcome)}", file=sys.stderr)
 
 
+def _cells(content: object) -> list | None:
+    """`content` as a cell list, or None if it is neither.
+
+    Observed 2026-09-01 against 9.3.0: `content` is typed `JSON` in the schema but a COLLECT
+    result arrives as a JSON *string* — `"[{\\"ref\\": \\"…\\"}]"` — not a parsed array. Not
+    an app defect: `normalizeAtomContent` (`src/api-contract/graph-queries.ts:151-173`)
+    already pins `content` to a string at the network boundary for exactly this reason. It
+    does mean the UI shows a computed list as raw JSON text, which is EPIC-260069 behaviour,
+    not something EPIC-260082 changed.
+    """
+    if isinstance(content, list):
+        return content
+    if isinstance(content, str):
+        try:
+            parsed = json.loads(content)
+        except json.JSONDecodeError:
+            return None
+        return parsed if isinstance(parsed, list) else None
+    return None
+
+
 def _report(atom: dict, query_name: str) -> None:
     status = atom.get("evaluationStatus")
     code = atom.get("errorCode")
@@ -115,11 +143,12 @@ def _report(atom: dict, query_name: str) -> None:
         print(f"probe: {query_name} FAILED to evaluate — causes={atom.get('causes')}", file=sys.stderr)
         return
 
-    if not isinstance(content, list):
-        print(f"probe: content is not a list ({type(content).__name__}) — {json.dumps(content)}", file=sys.stderr)
+    cells = _cells(content)
+    if cells is None:
+        print(f"probe: content is neither a list nor JSON text — {json.dumps(content)}", file=sys.stderr)
         return
 
-    refs = [cell for cell in content if isinstance(cell, dict) and "ref" in cell]
+    refs = [cell for cell in cells if isinstance(cell, dict) and "ref" in cell]
     print(f"probe: {query_name} collected {len(refs)} atom(s).", file=sys.stderr)
     if len(refs) != len(content):
         print(

@@ -39,3 +39,7 @@ coverage
 
 # Python
 __pycache__/
+
+# Backend probe: real credentials live only here, never in git history.
+# tools/backend_probe/probe_config.example.json (tracked) is the template.
+tools/backend_probe/probe_config.json

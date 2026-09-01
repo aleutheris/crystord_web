@@ -70,6 +70,11 @@ mutation Destroy($uuid: String) {
 }
 """.strip()
 
+# `change` rejects `labels: []` with `AC-LABELS-EMPTY` — an undocumented code (observed
+# 2026-09-01 against 9.3.0; it appears nowhere in docs/user-guide.md). Unrelated to the
+# COLLECT `labels` CONSTANT this probe is testing; the atom just needs one label to exist.
+PROBE_LABEL = "backend_probe"
+
 # case -> (collect query name, constants map, the code user-guide.md:1305 predicts)
 CASES = {
     "empty-value": ("atoms_in_category_subtree", {"dimension_key": "x", "value_key": ""}, "OP-COLLECT-CONSTANTS-INVALID"),
@@ -88,7 +93,7 @@ def _create(session: Session, case: str, query_name: str, constants: dict) -> st
         CHANGE_MUTATION,
         {
             "inputs": [{
-                "labels": [],
+                "labels": [PROBE_LABEL],
                 "properties": {"nuclearies": {
                     "title": f"probe-collect-{case}",
                     "operation": operation,
