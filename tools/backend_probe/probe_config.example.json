@@ -1,0 +1,17 @@
+{
+  "_comment": [
+    "Template. Copy this file to probe_config.json (gitignored) and fill in a real",
+    "password there — probe_config.json is never committed, so its passwords never",
+    "reach git history. This tracked file must never hold a real credential.",
+    "Servers are NOT defined here: 'profile' names a profile in ../../deploy_config.json,",
+    "which stays the single source of truth for endpoints. Leave 'profile' empty to",
+    "follow deploy_config.json's own 'active'.",
+    "CRYSTORD_EMAIL / CRYSTORD_PASSWORD_<USER> / CRYSTORD_PASSWORD still override these",
+    "fields, for an account whose password you would rather not write to disk at all."
+  ],
+  "profile": "",
+  "activeUser": "demo",
+  "users": {
+    "demo": { "email": "demo@demo.invalid", "password": "REPLACE_ME" }
+  }
+}
