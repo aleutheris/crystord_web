@@ -85,6 +85,46 @@ describe('formatFormula', () => {
       formatFormula({ name: 'COLLECT', args: ['atoms_by_owner'] }, ATOMS, {}),
     ).toBe('COLLECT(atoms_by_owner)')
   })
+
+  it('renders the dimension and value a category COLLECT actually collects', () => {
+    expect(
+      formatFormula(
+        { name: 'COLLECT', args: ['atoms_in_category_value'] },
+        ATOMS,
+        { dimension_key: 'region', value_key: 'europe' },
+      ),
+    ).toBe('COLLECT(atoms_in_category_value → region ▸ europe)')
+  })
+
+  it('keeps the subtree query distinguishable from the exact one', () => {
+    // The exact-vs-subtree distinction rides on the query name, which renders verbatim.
+    expect(
+      formatFormula(
+        { name: 'COLLECT', args: ['atoms_in_category_subtree'] },
+        ATOMS,
+        { dimension_key: 'region', value_key: 'europe' },
+      ),
+    ).toBe('COLLECT(atoms_in_category_subtree → region ▸ europe)')
+  })
+
+  it('names an incomplete category pair rather than rendering it as a filtered one', () => {
+    expect(
+      formatFormula({ name: 'COLLECT', args: ['atoms_in_category_value'] }, ATOMS, { dimension_key: 'region' }),
+    ).toBe('COLLECT(atoms_in_category_value → no category)')
+    expect(
+      formatFormula({ name: 'COLLECT', args: ['atoms_in_category_value'] }, ATOMS, null),
+    ).toBe('COLLECT(atoms_in_category_value → no category)')
+  })
+
+  it('ignores non-string category constants instead of rendering them', () => {
+    expect(
+      formatFormula(
+        { name: 'COLLECT', args: ['atoms_in_category_subtree'] },
+        ATOMS,
+        { dimension_key: 'region', value_key: 7 },
+      ),
+    ).toBe('COLLECT(atoms_in_category_subtree → no category)')
+  })
 })
 
 describe('countInputArgs', () => {

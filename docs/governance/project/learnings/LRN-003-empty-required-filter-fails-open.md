@@ -99,12 +99,31 @@ list is empty?" If the answer is "everything", that path needs a guard before it
 - Related ADRs: ADR-260027 D2 (auto-chip uncommitted text — the decision that already covered
   this and was not applied here); ADR-260065 (client-side operation metadata table, whose
   recorded drift risk this realizes)
-- Related ICRs / contracts: none opened. Backend-side asks identified but not yet filed —
-  reject empty required constants rather than executing them as a wildcard, and extend
-  `discoverOperations` with machine-readable arity / arg-kind / required-constant metadata so
-  clients can generate this validation instead of hardcoding it.
+- Related ICRs / contracts: ICR-260081 (pins schema `~9.3.0`). **Both backend-side asks recorded
+  here were GRANTED in schema 9.3.0** (2026-08-29), though neither was ever formally filed:
+  - *Reject empty required constants rather than executing them as a wildcard* — granted.
+    `user-guide.md:1305` now specifies `OP-COLLECT-CONSTANTS-MISSING` / `-INVALID`, with "no
+    query runs and no rows are returned — an empty filter never means 'match everything'".
+    The original defect in §2 is therefore no longer reproducible against a 9.3.0 backend.
+  - *Machine-readable arity / required-constant metadata* — granted. `collectQueries` returns
+    `CollectQueryInfo { name, description, constants: [ConstantSpec { key, type, minItems }] }`,
+    and `OperationFunction` gained `minArity` / `maxArity` / `numericOnly`.
+
+  **Neither grant was noticed when 9.3.0 was adopted** (see §8), and EPIC-260082 went on to
+  re-entrench the obsolete "empty labels collects every owned atom" rationale in code comments,
+  user-facing copy, and a ratified acceptance criterion before a review caught it. The general
+  lesson below still holds; its specific backend hazard does not.
 
 ## 8. Status
 
-- Status: Active
+- Status: Active — the general lesson (a client cannot assume a backend rejects a degenerate
+  filter, and must verify what "empty" means at the boundary) stands. Its specific hazard is
+  closed: 9.3.0 rejects empty required constants (see §7).
 - Superseded by: N/A
+- **Follow-on lesson (2026-08-31).** Both grants shipped in a bundle whose impact analysis
+  (ICR-260081 §4) correctly called the change "purely additive, entirely on the operation-discovery
+  surface" — accurate about the *GraphQL schema*, and precisely why the behavioural change was
+  missed: **constants-validation semantics live only in `user-guide.md`, where no schema diff can
+  see them.** A schema-diff-driven ICR has a blind spot for behaviour. Adopted: an ICR that adopts
+  a new backend bundle must diff the **guide** as well as the schema, and re-check any client-side
+  rationale that asserts backend behaviour.

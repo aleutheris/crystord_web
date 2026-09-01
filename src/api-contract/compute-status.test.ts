@@ -45,6 +45,16 @@ describe('computeStatusFor', () => {
     ['OP-DIVISION-BY-ZERO', 'Division by zero'],
     ['AU-DEPENDENCY-MISSING', 'Missing dependency'],
     ['OP-SIG-SHAPE-MISMATCH', 'Shape mismatch'],
+    // Codes 9.3.0 documented: the COLLECT trio (user-guide.md:1305) plus
+    // OP-OPERAND-TYPE-MISMATCH (user-guide.md:1150), which a sweep scoped to "what 9.3.0 added"
+    // missed — that one predates 9.3.0 and was never mapped at all. Unmapped, a code is not
+    // shown at all here: the badge falls back to 'Computation failed' (pinned below), so the
+    // user gets no clue what went wrong. QUERY-UNKNOWN is reachable from the UI's ungated
+    // free-text query name.
+    ['OP-COLLECT-CONSTANTS-MISSING', 'Collect setting missing'],
+    ['OP-COLLECT-CONSTANTS-INVALID', 'Collect setting invalid'],
+    ['OP-COLLECT-QUERY-UNKNOWN', 'Unknown collect query'],
+    ['OP-OPERAND-TYPE-MISMATCH', 'Input type mismatch'],
   ])('maps failed-origin with %s to an error badge', (errorCode, summary) => {
     expect(computeStatusFor(atom({ evaluationStatus: 'failed-origin', errorCode }))).toEqual({
       kind: 'error',

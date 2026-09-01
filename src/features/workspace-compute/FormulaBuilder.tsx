@@ -1,11 +1,13 @@
 import { useState } from 'react'
 import type { Atom, OperationPayload } from '../../api-contract'
-import { LabelChipEditor } from '../../ui-primitives'
 import { C_TEXT_SECONDARY, C_ERROR } from '../../styles/tokens'
-import { argBounds, isCollectOperation, collectQueryRequiresLabels, COLLECT_QUERIES } from './operation-metadata'
+import { argBounds, isCollectOperation, COLLECT_OWNED_CONSTANTS } from './operation-metadata'
 import type { ArgBounds } from './operation-metadata'
+import { collectBlockMessage } from './collect-constants'
+import { useCollectDraft } from './use-collect-draft'
 import { ArgSlots } from './ArgSlots'
 import type { ArgSlotRow } from './ArgSlots'
+import { CollectEditor } from './CollectEditor'
 import { ConstantsEditor } from './ConstantsEditor'
 import type { ConstantEntry } from './ConstantsEditor'
 import { constantValue } from './formula-format'
@@ -19,9 +21,6 @@ interface FormulaBuilderProps {
   onSave: (payload: OperationPayload, constants: Record<string, unknown>) => void
   onCancel: () => void
 }
-
-/** Sentinel for the free-text COLLECT query option (future backend registrations). */
-const OTHER_QUERY = '__other__'
 
 /** Fit rows to the operation's arity: trim above max, pad to min with empty atom slots. */
 function fitRows(rows: ArgSlotRow[], bounds: ArgBounds): ArgSlotRow[] {
@@ -38,7 +37,6 @@ function fitRows(rows: ArgSlotRow[], bounds: ArgBounds): ArgSlotRow[] {
 export function FormulaBuilder({ initial, initialConstants, atoms, saving, onSave, onCancel }: FormulaBuilderProps) {
   const { operations } = useOperations()
   const initialName = initial?.name ?? 'SUM'
-  const initialCollectArg = initial && isCollectOperation(initial.name) ? initial.args[0] ?? '' : ''
 
   const [name, setName] = useState(initialName)
   const [rows, setRows] = useState<ArgSlotRow[]>(() => fitRows(
@@ -47,44 +45,55 @@ export function FormulaBuilder({ initial, initialConstants, atoms, saving, onSav
       : [],
     argBounds(initialName),
   ))
-  const [collectChoice, setCollectChoice] = useState(
-    initialCollectArg !== '' && !COLLECT_QUERIES.includes(initialCollectArg) ? OTHER_QUERY : (initialCollectArg || COLLECT_QUERIES[0]!),
-  )
-  const [customQuery, setCustomQuery] = useState(COLLECT_QUERIES.includes(initialCollectArg) ? '' : initialCollectArg)
-  const [labels, setLabels] = useState<string[]>(() => {
-    const raw = initialConstants['labels']
-    return Array.isArray(raw) ? raw.filter((l): l is string => typeof l === 'string') : []
-  })
-  // Uncommitted chip-editor text (the DetailPanel creation-form pattern). A chip only exists
-  // after Enter, so a user who typed a label and clicked Save formula would otherwise ship
-  // `labels: []` — which COLLECT reads as "every atom", not "none" (ADR-260027 D2).
-  const [labelDraft, setLabelDraft] = useState('')
+  // Declared ahead of the draft because the draft's lazy taxonomy fetch is gated on it: the
+  // selected COLLECT query cannot tell the hook whether its category editor is still rendered.
+  const collect = isCollectOperation(name)
+  const draft = useCollectDraft(initial, initialConstants, collect)
+  // Whether the atom ARRIVED as a COLLECT — fixed for the life of the mount, and the only case in
+  // which `dimension_key`/`value_key`/`labels` belong to the query editor rather than to the user.
+  // Reserving those names globally would strip a hand-authored constant of the same name off a
+  // plain SUM: it would vanish from the editor, dangle any arg referencing it, and be dropped on
+  // save. They are plausible user names in a taxonomy-heavy product, so scope the reservation.
+  const collectInitially = initial !== null && isCollectOperation(initial.name)
   const [entries, setEntries] = useState<ConstantEntry[]>(() =>
     Object.entries(initialConstants)
-      .filter(([key]) => key !== 'labels')
+      .filter(([key]) => !collectInitially || !COLLECT_OWNED_CONSTANTS.includes(key))
       .map(([key, value]) => ({ key, value: String(value) })))
 
-  const collect = isCollectOperation(name)
   // A previously saved unknown operation stays selectable even if discovery doesn't list it.
   const options = operations.some((op) => op.name === name)
     ? operations
     : [{ name, description: '' }, ...operations]
   const description = options.find((op) => op.name === name)?.description
   const constantKeys = [...new Set(entries.map((e) => e.key.trim()).filter((k) => k !== ''))]
-  const queryName = collectChoice === OTHER_QUERY ? customQuery.trim() : collectChoice
-
-  // What the save would actually send: committed chips plus any typed-but-uncommitted text.
-  const pendingLabel = labelDraft.trim()
-  const effectiveLabels = pendingLabel && !labels.includes(pendingLabel) ? [...labels, pendingLabel] : labels
 
   // Save gating with a reason (never a silently dead button). Arity minimums are enforced
   // structurally — rows are padded to min — so an unmet arity shows up as an empty slot.
   const blockReason = collect
-    ? queryName === ''
+    ? draft.queryName === ''
       ? 'Enter the collect query name.'
-      : collectQueryRequiresLabels(queryName) && effectiveLabels.length === 0
-        ? 'Add at least one label — this query would otherwise collect every atom you own.'
-        : null
+      : draft.missing.length > 0
+        ? collectBlockMessage(draft.missing)
+        // `valueUnusable` is data-dependent, and the data is not here yet: mid-load the value
+        // list is empty, so a stored key falls to the sticky option, which carries no access
+        // information and reads as usable. Saving inside that window would slip an unownable
+        // value past the check below — and re-opening an atom that already collects nothing is
+        // exactly when that check earns its keep. Costs nothing for fresh authoring: an unset
+        // value is already blocked above, so this only bites while a STORED one is being verified.
+        //
+        // KNOWN GAP (recorded, not closed here): loading is only one of three ways the value list
+        // can lack access data. A values load that FAILED, or a page full at the ceiling, both
+        // leave `loading === false` with the stored key on the unflagged sticky option, so
+        // `valueUnusable` reads false and the save is released without the value being verified.
+        // Gating on `valuesAuthoritative` instead would close the failure case but permanently
+        // strand any stored value past the ceiling, contradicting the recorded "unresolvable
+        // stored key does not block save" decision. A design call, not a wider condition — see
+        // EPIC-260082 §Implementation Notes finding 17.
+        : draft.editor === 'category' && draft.categoriesLoading
+          ? 'Checking the selected category value…'
+          : draft.valueUnusable
+            ? 'Choose a category value you own — this query cannot resolve a value shared with you, so it would collect nothing.'
+            : null
     : rows.some((r) => r.value === '')
       ? 'Fill every argument slot.'
       : rows.some((r) => r.source === 'constant' && !constantKeys.includes(r.value))
@@ -93,12 +102,15 @@ export function FormulaBuilder({ initial, initialConstants, atoms, saving, onSav
 
   function changeOperation(next: string) {
     setName(next)
-    if (!isCollectOperation(next)) setRows((prev) => fitRows(prev, argBounds(next)))
+    if (!isCollectOperation(next)) {
+      setRows((prev) => fitRows(prev, argBounds(next)))
+      draft.dropLabelDraft()
+    }
   }
 
   function save() {
     if (collect) {
-      onSave({ name, args: [queryName] }, { labels: effectiveLabels })
+      onSave({ name, args: [draft.queryName] }, draft.constants)
       return
     }
     const constants: Record<string, unknown> = {}
@@ -131,45 +143,27 @@ export function FormulaBuilder({ initial, initialConstants, atoms, saving, onSav
       </div>
 
       {collect ? (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-          <div>
-            <label htmlFor="compute-collect-query" style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600 }}>
-              Collect query
-            </label>
-            <select
-              id="compute-collect-query"
-              value={collectChoice}
-              onChange={(e) => setCollectChoice(e.target.value)}
-              style={{ fontSize: '0.85rem', marginTop: '0.2rem' }}
-            >
-              {COLLECT_QUERIES.map((q) => (
-                <option key={q} value={q}>{q}</option>
-              ))}
-              <option value={OTHER_QUERY}>other…</option>
-            </select>
-            {collectChoice === OTHER_QUERY && (
-              <input
-                aria-label="Custom collect query name"
-                value={customQuery}
-                placeholder="query name"
-                onChange={(e) => setCustomQuery(e.target.value)}
-                style={{ fontSize: '0.8rem', marginTop: '0.3rem', display: 'block' }}
-              />
-            )}
-          </div>
-          <div>
-            <span style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '0.2rem' }}>
-              Labels to collect
-            </span>
-            <LabelChipEditor
-              labels={labels}
-              ariaLabel="Collect labels"
-              onAdd={(label) => setLabels((prev) => [...prev, label])}
-              onRemove={(label) => setLabels((prev) => prev.filter((l) => l !== label))}
-              onDraftChange={setLabelDraft}
-            />
-          </div>
-        </div>
+        <CollectEditor
+          choice={draft.choice}
+          customQuery={draft.customQuery}
+          editor={draft.editor}
+          labels={draft.labels}
+          dimensionKey={draft.dimensionKey}
+          valueKey={draft.valueKey}
+          dimensionOptions={draft.dimensionOptions}
+          valueOptions={draft.valueOptions}
+          categoriesLoading={draft.categoriesLoading}
+          categoriesError={draft.categoriesError}
+          dimensionsTruncated={draft.dimensionsTruncated}
+          valuesTruncated={draft.valuesTruncated}
+          onChoiceChange={draft.changeChoice}
+          onCustomQueryChange={draft.changeCustomQuery}
+          onAddLabel={draft.addLabel}
+          onRemoveLabel={draft.removeLabel}
+          onLabelDraftChange={draft.setLabelDraft}
+          onDimensionChange={draft.changeDimension}
+          onValueChange={draft.changeValue}
+        />
       ) : (
         <>
           <ArgSlots rows={rows} bounds={argBounds(name)} atoms={atoms} constantKeys={constantKeys} onChange={setRows} />

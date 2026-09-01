@@ -80,6 +80,14 @@ describe('ExplainSection', () => {
     ['OP-DIVISION-BY-ZERO', /division by zero/],
     ['AU-DEPENDENCY-MISSING', /dependency is missing/],
     ['OP-SIG-SHAPE-MISMATCH', /shape mismatch/],
+    // Codes 9.3.0 documented: the COLLECT trio (user-guide.md:1305), which is the feature this
+    // epic shipped, plus OP-OPERAND-TYPE-MISMATCH (user-guide.md:1150) — named by 9.3.0 but
+    // older than it, and missed by a sweep scoped to "what 9.3.0 added". It is how the ref cells
+    // a COLLECT produces fail, so the generic sentence is the worst place for it to land.
+    ['OP-COLLECT-CONSTANTS-MISSING', /missing a required setting/],
+    ['OP-COLLECT-CONSTANTS-INVALID', /empty or the wrong type/],
+    ['OP-COLLECT-QUERY-UNKNOWN', /not registered on the server/],
+    ['OP-OPERAND-TYPE-MISMATCH', /not the type the operation needs/],
   ])('explains failed-origin %s in plain language', (errorCode, sentence) => {
     render(
       <ExplainSection atom={makeAtom({ evaluationStatus: 'failed-origin', errorCode })} payload={PAYLOAD} atoms={WORKING_SET} />,

@@ -14,6 +14,19 @@ vi.mock('./use-operations', () => ({
   }),
 }))
 
+// The builder reaches Apollo through `useCollectDraft` → `useCategoryOptions`, even for a
+// non-category formula (hooks cannot be called conditionally). Stubbed like `useOperations`.
+vi.mock('./use-category-options', () => ({
+  useCategoryOptions: () => ({
+    dimensions: [],
+    values: [],
+    dimensionsAuthoritative: false,
+    valuesAuthoritative: false,
+    loading: false,
+    error: null,
+  }),
+}))
+
 function makeAtom(overrides: Partial<Atom> = {}, operation = '', constants: Record<string, unknown> | null = {}): Atom {
   return {
     labels: [],

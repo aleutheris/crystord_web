@@ -1,10 +1,17 @@
 import { gql } from '@apollo/client'
 
 /**
- * Taxonomy documents + types (schema 9.2.0). Reads landed with ADR-260063 / EPIC-260067;
- * the browse document, the authoring mutations, and the retrieve category filter shape are
- * ADR-260064 / EPIC-260068. All operations are access-scoped by the backend — they return
- * only taxonomy the caller owns or has been granted.
+ * Taxonomy documents + types. Reads landed with ADR-260063 / EPIC-260067; the browse document,
+ * the authoring mutations, and the retrieve category filter shape are ADR-260064 / EPIC-260068.
+ * All operations are access-scoped by the backend — "returns only taxonomy the caller owns or has
+ * been granted access to" (`user-guide.md:268-272`). `workspace-compute`'s category COLLECT
+ * pickers joined the readers in EPIC-260082, so a change here is never single-feature.
+ *
+ * These are the 9.2.0 shapes, UNCHANGED under the `~9.3.0` pin (ICR-260081) — not renumbered,
+ * which would imply a 9.3.0 revision that never happened. Verified across the adoption commit
+ * `7d0b6de` on BOTH halves of the contract, per the rule that epic adopted: the `schema.graphql`
+ * delta is only `collectQueries` / `CollectQueryInfo` / `ConstantSpec` and `OperationFunction`
+ * arity metadata, and no `user-guide.md` hunk touches category retrieval.
  */
 
 export const RETRIEVE_CATEGORY_DIMENSIONS_QUERY = gql`

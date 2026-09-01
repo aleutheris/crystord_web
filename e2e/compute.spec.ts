@@ -12,6 +12,30 @@ const OPERATIONS = [
   { name: 'COLLECT', description: 'Collect atoms via a registered query.' },
 ]
 
+// EPIC-260082: the taxonomy behind the category COLLECT queries' dimension/value pickers.
+const DIMENSIONS = [
+  {
+    key: 'region',
+    displayName: 'Region',
+    description: null,
+    parentDimensionKeys: [],
+    accessLevel: 'OWNER',
+    ownerUsername: 'demo',
+  },
+]
+
+const VALUES = [
+  {
+    key: 'europe',
+    displayName: 'Europe',
+    description: null,
+    dimensionKey: 'region',
+    parentValueKeys: [],
+    accessLevel: 'OWNER',
+    ownerUsername: 'demo',
+  },
+]
+
 interface EvalOverrides {
   evaluationStatus?: string | null
   errorCode?: string | null
@@ -77,6 +101,10 @@ function mockGraphQL(page: import('@playwright/test').Page) {
     if (query.includes('signin')) return ok({ signin: 'mock-token' })
     if (query.includes('listLabels')) return ok({ listLabels: ['Num'] })
     if (query.includes('discoverOperations')) return ok({ discoverOperations: OPERATIONS })
+    // Both category documents must be matched BEFORE the bare `retrieve` check below — their
+    // operation names contain it, so the generic branch would otherwise swallow them.
+    if (query.includes('retrieveCategoryDimensions')) return ok({ retrieveCategoryDimensions: DIMENSIONS })
+    if (query.includes('retrieveCategoryValues')) return ok({ retrieveCategoryValues: VALUES })
     if (query.includes('retrieve')) return ok({ retrieve: atoms })
     if (query.includes('change')) return ok({ change: [body.variables?.selector?.uuid ?? 'atom-1'] })
     return unmockedOperation(page, route, query)
@@ -153,6 +181,35 @@ test.describe('Compute tab', () => {
     expect(nuclearies.operation).toContain('atom-2')
     expect(nuclearies.operation).toContain('atom-3')
     expect(nuclearies.constants).toEqual({})
+  })
+
+  test('authoring a category COLLECT sends dimension/value constants, never labels', async ({ page }) => {
+    await mockGraphQL(page)
+    await signIn(page)
+    await submitSearch(page)
+    await openComputeTab(page, 'Alpha')
+
+    await page.getByRole('button', { name: 'Add computation' }).click()
+    await page.getByLabel('Operation').selectOption('COLLECT')
+    await page.getByLabel('Collect query').selectOption('atoms_in_category_subtree')
+
+    // The labels editor is gone — this query takes a dimension/value pair instead.
+    await expect(page.getByLabel('Add label')).toHaveCount(0)
+    // Blocked until both keys are chosen: an unresolved pair collects nothing at all.
+    await expect(page.getByRole('button', { name: 'Save formula' })).toBeDisabled()
+
+    await page.getByLabel('Category dimension').selectOption('region')
+    await page.getByLabel('Category value').selectOption('europe')
+
+    const changePromise = waitForChange(page)
+    await page.getByRole('button', { name: 'Save formula' }).click()
+    const changeResponse = await changePromise
+
+    const sent = JSON.parse(changeResponse.request().postData()!)
+    const nuclearies = sent.variables.inputs[0].properties.nuclearies
+    expect(nuclearies.operation).toContain('"name":"COLLECT"')
+    expect(nuclearies.operation).toContain('atoms_in_category_subtree')
+    expect(nuclearies.constants).toEqual({ dimension_key: 'region', value_key: 'europe' })
   })
 
   test('a failed atom shows the error badge in Flow and the failure explanation in the tab', async ({ page }) => {
