@@ -1,6 +1,6 @@
-import { GraphCanvas, NetworkCanvas } from '../../features/workspace-graph'
-import { TableView } from '../../features/workspace-table'
-import { BoardView } from '../../features/workspace-board'
+import { GraphCanvas, NetworkCanvas, flowViewHelp, networkViewHelp } from '../../features/workspace-graph'
+import { TableView, tableViewHelp } from '../../features/workspace-table'
+import { BoardView, boardViewHelp } from '../../features/workspace-board'
 import { networkViewEnabled } from '../../feature-flags'
 import type { ViewDescriptor } from './slot-types'
 
@@ -14,10 +14,10 @@ import type { ViewDescriptor } from './slot-types'
  * gated by `networkViewEnabled` (ADR-260032).
  */
 export const views: ViewDescriptor[] = [
-  { id: 'network', label: 'Network', enabled: networkViewEnabled, Component: NetworkCanvas },
-  { id: 'flow', label: 'Flow', Component: GraphCanvas },
-  { id: 'table', label: 'Table', Component: TableView },
-  { id: 'board', label: 'Board', Component: BoardView },
+  { id: 'network', label: 'Network', enabled: networkViewEnabled, help: networkViewHelp, Component: NetworkCanvas },
+  { id: 'flow', label: 'Flow', help: flowViewHelp, Component: GraphCanvas },
+  { id: 'table', label: 'Table', help: tableViewHelp, Component: TableView },
+  { id: 'board', label: 'Board', help: boardViewHelp, Component: BoardView },
 ]
 
 /**

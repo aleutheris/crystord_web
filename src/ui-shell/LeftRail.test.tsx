@@ -7,24 +7,29 @@ import { DEFAULT_LEFT_RAIL_WIDTH, LEFT_RAIL_MAX_WIDTH, LEFT_RAIL_MIN_WIDTH } fro
 import type { WorkspaceFilter } from '../ui-primitives'
 
 // Two navigators — the registry shape since EPIC-260068 — so the lens switcher renders.
-vi.mock('./slots', () => ({
-  navigators: [
-    { id: 'labels', label: 'Labels', Component: () => <div data-testid="nav-labels">labels-nav</div> },
-    {
-      id: 'categories',
-      label: 'Categories',
-      Component: ({ filter, onFilterChange }: {
-        filter?: WorkspaceFilter
-        onFilterChange?: (f: WorkspaceFilter) => void
-      }) => (
-        <div data-testid="nav-categories">
-          <span data-testid="filter-json">{JSON.stringify(filter)}</span>
-          <button type="button" onClick={() => onFilterChange?.({ labels: [], categories: [] })}>propose</button>
-        </div>
-      ),
-    },
-  ],
-}))
+vi.mock('./slots', () => {
+  // `help` is required on every descriptor since EPIC-260080 (C2) — the rail ignores it.
+  const help = { summary: 'Stub summary.', body: [{ kind: 'paragraph' as const, text: 'Stub body.' }] }
+  return {
+    navigators: [
+      { id: 'labels', label: 'Labels', help, Component: () => <div data-testid="nav-labels">labels-nav</div> },
+      {
+        id: 'categories',
+        label: 'Categories',
+        help,
+        Component: ({ filter, onFilterChange }: {
+          filter?: WorkspaceFilter
+          onFilterChange?: (f: WorkspaceFilter) => void
+        }) => (
+          <div data-testid="nav-categories">
+            <span data-testid="filter-json">{JSON.stringify(filter)}</span>
+            <button type="button" onClick={() => onFilterChange?.({ labels: [], categories: [] })}>propose</button>
+          </div>
+        ),
+      },
+    ],
+  }
+})
 
 function provide(
   leftRailCollapsed: boolean,

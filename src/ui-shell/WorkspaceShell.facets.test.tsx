@@ -72,28 +72,33 @@ vi.mock('@xyflow/react', () => ({
 }))
 
 // A minimal registry: one view and one navigator that proposes a facet filter on click.
-vi.mock('./slots', () => ({
-  enabledViews: [{ id: 'flow', label: 'Flow', Component: () => <div data-testid="view" /> }],
-  initialActiveView: () => 'flow',
-  inspectorTabs: [],
-  navigators: [
-    {
-      id: 'categories',
-      label: 'Categories',
-      Component: ({ onFilterChange }: { onFilterChange?: (f: WorkspaceFilter) => void }) => (
-        <button
-          type="button"
-          onClick={() => onFilterChange?.({
-            labels: [],
-            categories: [{ dimensionKey: 'region', valueKeys: ['europe'], includeDescendants: true }],
-          })}
-        >
-          propose facet
-        </button>
-      ),
-    },
-  ],
-}))
+vi.mock('./slots', () => {
+  // `help` is required on every descriptor since EPIC-260080 (C2); only the help panel reads it.
+  const help = { summary: 'Stub summary.', body: [{ kind: 'paragraph' as const, text: 'Stub body.' }] }
+  return {
+    enabledViews: [{ id: 'flow', label: 'Flow', help, Component: () => <div data-testid="view" /> }],
+    initialActiveView: () => 'flow',
+    inspectorTabs: [],
+    navigators: [
+      {
+        id: 'categories',
+        label: 'Categories',
+        help,
+        Component: ({ onFilterChange }: { onFilterChange?: (f: WorkspaceFilter) => void }) => (
+          <button
+            type="button"
+            onClick={() => onFilterChange?.({
+              labels: [],
+              categories: [{ dimensionKey: 'region', valueKeys: ['europe'], includeDescendants: true }],
+            })}
+          >
+            propose facet
+          </button>
+        ),
+      },
+    ],
+  }
+})
 
 beforeEach(() => {
   mockSearch.mockClear()

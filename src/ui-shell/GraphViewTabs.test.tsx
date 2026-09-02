@@ -4,9 +4,12 @@ import userEvent from '@testing-library/user-event'
 import { GraphViewTabs } from './GraphViewTabs'
 import type { ViewDescriptor } from './slots/slot-types'
 
+// `help` is required on every descriptor since EPIC-260080 (C2) — the tab strip ignores it.
+const stubHelp = { summary: 'Stub summary.', body: [{ kind: 'paragraph' as const, text: 'Stub body.' }] }
+
 const tabViews: ViewDescriptor[] = [
-  { id: 'network', label: 'Network', Component: () => null },
-  { id: 'flow', label: 'Flow', Component: () => null },
+  { id: 'network', label: 'Network', help: stubHelp, Component: () => null },
+  { id: 'flow', label: 'Flow', help: stubHelp, Component: () => null },
 ]
 
 describe('GraphViewTabs', () => {
@@ -80,7 +83,7 @@ describe('GraphViewTabs', () => {
   })
 
   it('is driven by the views registry — only renders the views it is given', () => {
-    render(<GraphViewTabs views={[{ id: 'flow', label: 'Flow', Component: () => null }]} activeView="flow" onViewChange={vi.fn()} />)
+    render(<GraphViewTabs views={[{ id: 'flow', label: 'Flow', help: stubHelp, Component: () => null }]} activeView="flow" onViewChange={vi.fn()} />)
     expect(screen.getByRole('tab', { name: 'Flow' })).toBeInTheDocument()
     expect(screen.queryByRole('tab', { name: 'Network' })).not.toBeInTheDocument()
   })

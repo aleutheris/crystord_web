@@ -1,5 +1,6 @@
 import { LabelsNavigator } from '../LabelsNavigator'
-import { CategoriesNavigator } from '../../features/workspace-categories'
+import { labelsNavigatorHelp } from '../labels-navigator-help'
+import { CategoriesNavigator, categoriesNavigatorHelp } from '../../features/workspace-categories'
 import type { NavigatorDescriptor } from './slot-types'
 
 /**
@@ -10,6 +11,6 @@ import type { NavigatorDescriptor } from './slot-types'
  * LeftRail into existence.
  */
 export const navigators: NavigatorDescriptor[] = [
-  { id: 'labels', label: 'Labels', Component: LabelsNavigator },
-  { id: 'categories', label: 'Categories', Component: CategoriesNavigator },
+  { id: 'labels', label: 'Labels', help: labelsNavigatorHelp, Component: LabelsNavigator },
+  { id: 'categories', label: 'Categories', help: categoriesNavigatorHelp, Component: CategoriesNavigator },
 ]

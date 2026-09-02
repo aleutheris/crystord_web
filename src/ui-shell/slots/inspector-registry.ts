@@ -1,8 +1,8 @@
-import { DetailPanel } from '../../features/workspace-details'
-import { ClassifyTab } from '../../features/workspace-classify'
-import { ComputeTab } from '../../features/workspace-compute'
-import { HistoryTab } from '../../features/workspace-history'
-import { ShareTab } from '../../features/workspace-share'
+import { DetailPanel, detailsTabHelp } from '../../features/workspace-details'
+import { ClassifyTab, classifyTabHelp } from '../../features/workspace-classify'
+import { ComputeTab, computeTabHelp } from '../../features/workspace-compute'
+import { HistoryTab, historyTabHelp } from '../../features/workspace-history'
+import { ShareTab, shareTabHelp } from '../../features/workspace-share'
 import type { InspectorTabDescriptor } from './slot-types'
 
 /**
@@ -15,9 +15,9 @@ import type { InspectorTabDescriptor } from './slot-types'
  * owner-gated via `when`, since every sharing operation is owner-only server-side.
  */
 export const inspectorTabs: InspectorTabDescriptor[] = [
-  { id: 'details', label: 'Details', Component: DetailPanel },
-  { id: 'classify', label: 'Classify', Component: ClassifyTab },
-  { id: 'compute', label: 'Compute', Component: ComputeTab },
-  { id: 'history', label: 'History', Component: HistoryTab },
-  { id: 'share', label: 'Share', when: (atom) => atom.accessLevel === 'OWNER', Component: ShareTab },
+  { id: 'details', label: 'Details', help: detailsTabHelp, Component: DetailPanel },
+  { id: 'classify', label: 'Classify', help: classifyTabHelp, Component: ClassifyTab },
+  { id: 'compute', label: 'Compute', help: computeTabHelp, Component: ComputeTab },
+  { id: 'history', label: 'History', help: historyTabHelp, Component: HistoryTab },
+  { id: 'share', label: 'Share', when: (atom) => atom.accessLevel === 'OWNER', help: shareTabHelp, Component: ShareTab },
 ]

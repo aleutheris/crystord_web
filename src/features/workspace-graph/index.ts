@@ -6,3 +6,4 @@ export { useGraphDegrade, REDUCED_THRESHOLD, BLOCKED_THRESHOLD } from './use-gra
 export type { GraphData } from './use-graph-data'
 export type { RenderMode } from './use-graph-degrade'
 export type { AtomNodeData } from './AtomNode'
+export { networkViewHelp, flowViewHelp } from './help'

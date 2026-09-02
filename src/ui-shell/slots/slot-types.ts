@@ -1,5 +1,6 @@
 import type { ComponentType } from 'react'
 import type { Atom } from '../../api-contract'
+import type { HelpSection } from '../../help'
 import type { GraphData } from '../../features/workspace-graph'
 import type { WorkspaceFilter } from '../../ui-primitives'
 
@@ -11,6 +12,12 @@ import type { WorkspaceFilter } from '../../ui-primitives'
  * leaf registers a capability by exporting its component from its feature barrel and
  * adding one descriptor entry — compile-time composition, not a runtime plugin registry
  * (which REQ-CR-260010 excludes and which would invert the ui-shell → feature direction).
+ *
+ * `help` is **required** on all three descriptors (ADR-260085 / EPIC-260080 C2): registering a
+ * surface without user-facing help fails typecheck (`TS2741`). That gate proves presence, not
+ * truth — no compiler can tell that a sentence is still accurate after a surface's meaning
+ * changes underneath it. The instrument for that is the process obligation in
+ * `project-instructions.md` §6, and it is a human check.
  */
 
 /** Props every center view receives. Matches the existing GraphCanvas/NetworkCanvas contract. */
@@ -34,6 +41,8 @@ export interface ViewDescriptor {
   label: string
   /** Availability gate (e.g. a feature flag). Undefined = always available. */
   enabled?: boolean
+  /** User-facing help for this view, authored in the feature module that owns it. Required. */
+  help: HelpSection
   Component: ComponentType<ViewProps>
 }
 
@@ -57,6 +66,8 @@ export interface InspectorTabDescriptor {
   label: string
   /** Optional per-atom relevance guard. Undefined = always shown. */
   when?: (atom: Atom) => boolean
+  /** User-facing help for this tab, authored in the feature module that owns it. Required. */
+  help: HelpSection
   Component: ComponentType<InspectorTabProps>
 }
 
@@ -77,5 +88,7 @@ export interface NavigatorProps {
 export interface NavigatorDescriptor {
   id: string
   label: string
+  /** User-facing help for this lens, authored beside the component that owns it. Required. */
+  help: HelpSection
   Component: ComponentType<NavigatorProps>
 }

@@ -5,31 +5,38 @@ import { Inspector } from './Inspector'
 import { WorkspaceProvider, type WorkspaceContextValue } from './workspace-context'
 import type { Atom } from '../api-contract'
 
-vi.mock('./slots', () => ({
-  inspectorTabs: [
-    {
-      id: 'details',
-      label: 'Details',
-      Component: ({ atom, onClose }: { atom: Atom; onClose: () => void }) => (
-        <div data-testid="details-tab">
-          {atom.properties.shellies.uuid}
-          <button type="button" onClick={onClose}>close</button>
-        </div>
-      ),
-    },
-    {
-      id: 'extra',
-      label: 'Extra',
-      Component: () => <div data-testid="extra-tab">extra</div>,
-    },
-    {
-      id: 'hidden',
-      label: 'Hidden',
-      when: () => false,
-      Component: () => <div data-testid="hidden-tab">hidden</div>,
-    },
-  ],
-}))
+vi.mock('./slots', () => {
+  // `help` is required on every descriptor since EPIC-260080 (C2) — the Inspector ignores it.
+  const help = { summary: 'Stub summary.', body: [{ kind: 'paragraph' as const, text: 'Stub body.' }] }
+  return {
+    inspectorTabs: [
+      {
+        id: 'details',
+        label: 'Details',
+        help,
+        Component: ({ atom, onClose }: { atom: Atom; onClose: () => void }) => (
+          <div data-testid="details-tab">
+            {atom.properties.shellies.uuid}
+            <button type="button" onClick={onClose}>close</button>
+          </div>
+        ),
+      },
+      {
+        id: 'extra',
+        label: 'Extra',
+        help,
+        Component: () => <div data-testid="extra-tab">extra</div>,
+      },
+      {
+        id: 'hidden',
+        label: 'Hidden',
+        when: () => false,
+        help,
+        Component: () => <div data-testid="hidden-tab">hidden</div>,
+      },
+    ],
+  }
+})
 
 const ATOM = { properties: { shellies: { uuid: 'a1' } } } as unknown as Atom
 

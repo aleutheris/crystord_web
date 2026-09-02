@@ -21,6 +21,7 @@ import { Inspector } from './Inspector'
 import { ViewErrorBoundary } from './ViewErrorBoundary'
 import { AccountMenu } from './AccountMenu'
 import { PreferencesPanel } from './PreferencesPanel'
+import { HelpPanel } from './help/HelpPanel'
 import { C_BORDER } from '../styles/tokens'
 
 export function WorkspaceShell({ googleClientId }: { googleClientId?: string }) {
@@ -40,6 +41,7 @@ export function WorkspaceShell({ googleClientId }: { googleClientId?: string }) 
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [isWorkspacesOpen, setIsWorkspacesOpen] = useState(false)
   const [isPreferencesOpen, setIsPreferencesOpen] = useState(false)
+  const [isHelpOpen, setIsHelpOpen] = useState(false)
   // One `me` fetch for the whole shell: the menu shows the identity, the workspace panel
   // derives the caller's role from it (ADR-260066).
   const { account } = useAccountInfo()
@@ -114,6 +116,18 @@ export function WorkspaceShell({ googleClientId }: { googleClientId?: string }) 
         <h1 style={{ margin: 0, fontSize: '1.25rem', flexShrink: 0 }}>Crystord</h1>
         <SearchBar search={search} recommendedLabels={recommendedLabels} />
         <FacetChips facets={categoryFacets} onChange={handleFacetsChange} />
+        {/* In-app help (ADR-260085 / EPIC-260080 C1): a standalone control, not an AccountMenu
+            item, because the epic's success metric is one click from anywhere in the shell.
+            Placed before AccountMenu so `Account menu` stays the rightmost header control. */}
+        <button
+          type="button"
+          aria-label="Help"
+          title="Help"
+          onClick={() => setIsHelpOpen(true)}
+          style={{ padding: '0.25rem 0.6rem', flexShrink: 0 }}
+        >
+          ?
+        </button>
         {/* One avatar menu consolidates the former ThemeToggle/Account/Sign-Out controls (ADR-260066). */}
         <AccountMenu
           account={account}
@@ -199,6 +213,11 @@ export function WorkspaceShell({ googleClientId }: { googleClientId?: string }) 
       )}
       {isPreferencesOpen && (
         <PreferencesPanel onClose={() => setIsPreferencesOpen(false)} />
+      )}
+      {/* Rendered as a sibling of the workspace tree, like every other panel here: opening help
+          mounts nothing new inside the workspace and unmounts nothing from it (C3). */}
+      {isHelpOpen && (
+        <HelpPanel activeView={activeView} onClose={() => setIsHelpOpen(false)} />
       )}
     </div>
     </WorkspaceProvider>

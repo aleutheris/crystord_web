@@ -27,6 +27,7 @@ project instantiation details only; foundational policy lives in the generic gov
 - Major modules and responsibilities: `auth-entry` (demo sign-in and entry guard), `workspace-graph` (canvas interactions and graph rendering), `workspace-search` (bootstrap and label-driven scoping), `workspace-details` (side-panel edit flows), `api-contract` (GraphQL bindings/adapters/compatibility checks), `ui-shell` (routing/layout/navigation shell), `ui-primitives` (shared template library — typed prop contracts and barrel exports for reusable UI primitives).
 - Module ownership map: Repository owner owns all modules in MVP; ownership split can be introduced Post-MVP by module boundary.
 - Allowed dependency directions: `ui-shell` composes feature modules; feature modules may depend on `ui-primitives`, shared utilities, and `api-contract`; feature modules must not import other feature internals; `ui-primitives` must not import from any feature module.
+- Shared leaf modules: `src/a11y/` (modal focus management) and `src/help/` (in-app help content types plus the core-concepts copy) import nothing and may be imported by both `ui-shell` and feature modules. `src/help/` exists specifically so a feature can author its own surface's help without importing `ui-shell` (ADR-260085).
 - Boundary contract catalog: Backend API/schema contract, internal module APIs, configuration contracts, `ui-primitives` prop contracts.
 - Behavior-oriented slicing plan: Vertical slices by capability: entry/auth, graph interaction, search/discovery, details editing, API-contract integration. Within each feature slice, `use-*.ts` hooks own behavior and components own presentation — established practice in `workspace-graph`, standard for all new slices.
 - UI Primitives template library: `src/ui-primitives/` hosts typed prop contracts for buttons, inputs, selection controls, feedback, layout, and typography. Path alias `@ui/*` resolves to this directory. New templates are added per the `CATALOG.md` convention guide (ADR-260051).
@@ -68,6 +69,12 @@ Requirement taxonomy and record naming follow `framework-reference.md` §2 and `
 - Observability acceptance checks: Required logs/events/metrics are emitted for critical flows and compatibility/auth failures with actionable diagnostic context.
 - Contract-stability checks: Backend contract compatibility validated before release.
 - Readability and documentation checks: No dead code, no unused imports, meaningful naming.
+- In-app help freshness checks (ADR-260085): a change that alters what a registered surface
+  (center view, inspector tab, navigator lens) means or does — **including renaming it** — should
+  diff that surface's help copy in the same commit. Sources: `src/features/<module>/help.ts`,
+  `src/ui-shell/labels-navigator-help.ts`, and `src/help/concepts.ts`. The required `help` field
+  catches a *missing* surface at compile time; nothing catches a section that has become untrue,
+  so this is a human check and is stated as one.
 - Branding acceptance checks: UI and design changes map to brand tokens/semantics and do not violate branding constraints in `docs/governance/project/branding.md`.
 
 Code cohesion defaults (required unless explicitly overridden with rationale):
