@@ -34,7 +34,7 @@ export interface WorkspacePreferences {
   setLeftRailWidth: (value: number) => void
 }
 
-export const DEFAULT_HOME_EMPHASIS: HomeEmphasis = 'compute'
+export const DEFAULT_HOME_EMPHASIS: HomeEmphasis = 'relationship'
 export const DEFAULT_COMPUTE_BADGES: ComputeBadges = 'always'
 export const DEFAULT_LEFT_RAIL_COLLAPSED = false
 export const DEFAULT_RIGHT_RAIL_COLLAPSED = false
