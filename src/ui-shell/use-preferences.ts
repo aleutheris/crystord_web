@@ -8,14 +8,18 @@ export type ComputeBadges = 'always' | 'onDemand'
  *
  * A localStorage-backed store modeled on `ThemeProvider`, exposed on the WorkspaceContext.
  * T4 ships the contract + defaults only — EPIC-260070 adds the toggle UI, and EPIC-260069
- * reads `homeEmphasis`/`computeBadges` to drive the compute emphasis (per the Q3 resolution:
- * compute-as-differentiator, so defaults lean `compute` / `always`).
+ * reads `homeEmphasis`/`computeBadges` to drive the compute emphasis. `computeBadges` leans
+ * `always` per the Q3 resolution; `homeEmphasis` leans `relationship` per ADR-260088.
  *
  * Literal semantics (the contract EPIC-260069 / EPIC-260070 consume):
  * - `homeEmphasis`: `compute` → Flow (compute/dependencies) is the prominent landing;
  *   `relationship` → Network (relationships) is prominent.
  * - `computeBadges`: `always` → status badges on every computed atom; `onDemand` → only on
  *   the currently selected atom (semantics fixed by ADR-260065 / EPIC-260069).
+ *
+ * Default note: `homeEmphasis` ships `relationship` (Network) per ADR-260088. This only
+ * changes the shipped default value — the mapping itself (`compute` → Flow prominent,
+ * `relationship` → Network prominent) is unchanged from ADR-260065 §7.
  *
  * Persistence note: like `ThemeProvider`, the value is written to localStorage on first render,
  * so the current default is sticky for a user who never toggles it (a later DEFAULT_* change

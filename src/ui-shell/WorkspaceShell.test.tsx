@@ -122,28 +122,29 @@ vi.mock('@xyflow/react', () => ({
 }))
 
 describe('WorkspaceShell view switching', () => {
-  // The initial view derives from the persisted homeEmphasis preference (ADR-260065), so
-  // each test starts from a clean store — the default emphasis is compute → Flow lands.
+  // The initial view derives from the persisted homeEmphasis preference (ADR-260065 §7
+  // mapping, ADR-260088 default) — each test starts from a clean store, so the shipped
+  // default emphasis (relationship → Network) lands.
   beforeEach(() => {
     localStorage.clear()
   })
 
-  it('renders Flow view as the default under the compute home emphasis (ADR-260065)', () => {
-    render(<WorkspaceShell />)
-    expect(screen.getByRole('tab', { name: 'Flow' })).toHaveAttribute('aria-selected', 'true')
-    expect(screen.getByTestId('flow-canvas')).toBeInTheDocument()
-  })
-
-  it('does not render the Network canvas by default', () => {
-    render(<WorkspaceShell />)
-    expect(screen.queryByTestId('network-canvas')).not.toBeInTheDocument()
-  })
-
-  it('renders Network view as the default when home emphasis is relationship', () => {
-    localStorage.setItem('crystord-home-emphasis', 'relationship')
+  it('renders Network view as the default under the relationship home emphasis (ADR-260088)', () => {
     render(<WorkspaceShell />)
     expect(screen.getByRole('tab', { name: 'Network' })).toHaveAttribute('aria-selected', 'true')
     expect(screen.getByTestId('network-canvas')).toBeInTheDocument()
+  })
+
+  it('does not render the Flow canvas by default', () => {
+    render(<WorkspaceShell />)
+    expect(screen.queryByTestId('flow-canvas')).not.toBeInTheDocument()
+  })
+
+  it('renders Flow view as the default when home emphasis is compute', () => {
+    localStorage.setItem('crystord-home-emphasis', 'compute')
+    render(<WorkspaceShell />)
+    expect(screen.getByRole('tab', { name: 'Flow' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByTestId('flow-canvas')).toBeInTheDocument()
   })
 
   it('switches to Network canvas when Network tab is clicked', async () => {
@@ -323,7 +324,7 @@ describe('WorkspaceShell in-app help (EPIC-260080)', () => {
   // the canvas's real ancestors and assert none of them contains the dialog.
   it('C3 — renders help outside the workspace subtree, so opening it disturbs nothing', async () => {
     render(<WorkspaceShell />)
-    const canvas = screen.getByTestId('flow-canvas')
+    const canvas = screen.getByTestId('network-canvas')
 
     await userEvent.click(screen.getByRole('button', { name: 'Help' }))
     const dialog = screen.getByRole('dialog', { name: 'Help' })
@@ -335,6 +336,6 @@ describe('WorkspaceShell in-app help (EPIC-260080)', () => {
       walked += 1
     }
     expect(walked).toBeGreaterThan(0)
-    expect(screen.getByTestId('flow-canvas')).toBe(canvas)
+    expect(screen.getByTestId('network-canvas')).toBe(canvas)
   })
 })

@@ -56,27 +56,27 @@ async function signIn(page: Page) {
 }
 
 test.describe('Preferences and workspace management (ADR-260066)', () => {
-  test('switching home emphasis in Preferences lands on Network on the next load', async ({ page }) => {
+  test('switching home emphasis in Preferences lands on Flow on the next load', async ({ page }) => {
     await mockGraphQL(page)
     await page.goto('/')
     await signIn(page)
 
-    // Compute default (ADR-260065): Flow is the landing view.
-    await expect(page.getByRole('tab', { name: 'Flow' })).toHaveAttribute('aria-selected', 'true')
+    // Shipped default (ADR-260088): Network is the landing view.
+    await expect(page.getByRole('tab', { name: 'Network' })).toHaveAttribute('aria-selected', 'true')
 
     await page.getByRole('button', { name: 'Account menu' }).click()
     await page.getByRole('menuitem', { name: /preferences/i }).click()
     const dialog = page.getByRole('dialog', { name: 'Preferences' })
     await expect(dialog).toBeVisible()
-    await dialog.getByRole('radio', { name: 'Relationships (Network first)' }).check()
+    await dialog.getByRole('radio', { name: 'Compute (Flow first)' }).check()
     await dialog.getByRole('button', { name: 'Close preferences' }).click()
 
     // The demo session is not persisted, so a reload lands on sign-in; the preference is
     // localStorage-backed and must survive into the next session's landing view.
     await page.reload()
     await signIn(page)
-    await expect(page.getByRole('tab', { name: 'Network' })).toHaveAttribute('aria-selected', 'true')
-    await expect(page.getByRole('tab', { name: 'Flow' })).toHaveAttribute('aria-selected', 'false')
+    await expect(page.getByRole('tab', { name: 'Flow' })).toHaveAttribute('aria-selected', 'true')
+    await expect(page.getByRole('tab', { name: 'Network' })).toHaveAttribute('aria-selected', 'false')
   })
 
   test('workspace panel lists workspaces, adds a member, and dissolves after two-step confirm', async ({ page }) => {

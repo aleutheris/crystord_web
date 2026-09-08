@@ -111,6 +111,12 @@ function mockGraphQL(page: import('@playwright/test').Page) {
   })
 }
 
+// The shipped default (ADR-260088) lands on Network; badges only stamp on Flow's node seam
+// (ADR-260065 §6), so the one test asserting Flow badge rendering primes compute emphasis.
+function primeComputeEmphasis(page: import('@playwright/test').Page) {
+  return page.addInitScript(() => localStorage.setItem('crystord-home-emphasis', 'compute'))
+}
+
 async function signIn(page: import('@playwright/test').Page) {
   await page.goto('/')
   await expect(page.getByRole('heading', { name: /sign in/i })).toBeVisible()
@@ -214,6 +220,7 @@ test.describe('Compute tab', () => {
 
   test('a failed atom shows the error badge in Flow and the failure explanation in the tab', async ({ page }) => {
     await mockGraphQL(page)
+    await primeComputeEmphasis(page)
     await signIn(page)
     await submitSearch(page)
 

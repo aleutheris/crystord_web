@@ -112,11 +112,15 @@ async function signIn(page: import('@playwright/test').Page) {
   await responsePromise
 }
 
-// The compute default (ADR-260065) lands on Flow, whose focused projection hides atoms
-// without OP_DEPENDENCY bonds. Tests exercising the Network canvas prime the relationship
-// emphasis BEFORE navigation so Network stays the landing view for them.
+// The shipped default (ADR-260088) lands on Network. Tests exercising Flow's focused
+// projection (which hides atoms without OP_DEPENDENCY bonds) prime the compute emphasis
+// BEFORE navigation so Flow is the landing view for them.
 function primeRelationshipEmphasis(page: import('@playwright/test').Page) {
   return page.addInitScript(() => localStorage.setItem('crystord-home-emphasis', 'relationship'))
+}
+
+function primeComputeEmphasis(page: import('@playwright/test').Page) {
+  return page.addInitScript(() => localStorage.setItem('crystord-home-emphasis', 'compute'))
 }
 
 async function submitSearch(page: import('@playwright/test').Page) {
@@ -282,18 +286,18 @@ test.describe('Graph workspace', () => {
     await expect(page.getByRole('button', { name: 'Account menu' })).toBeVisible()
   })
 
-  test('shows Flow view as default after sign-in under compute emphasis', async ({ page }) => {
+  test('shows Flow view as default when home emphasis is compute', async ({ page }) => {
     await mockGraphQL(page)
+    await primeComputeEmphasis(page)
     await signIn(page)
 
-    // ADR-260065: the compute default emphasis lands on Flow (the differentiator view).
+    // ADR-260065 §7 mapping: the compute emphasis lands on Flow (the differentiator view).
     await expect(page.getByRole('tab', { name: 'Flow' })).toHaveAttribute('aria-selected', 'true')
     await expect(page.getByRole('tab', { name: 'Network' })).toHaveAttribute('aria-selected', 'false')
   })
 
-  test('shows Network view as default when home emphasis is relationship', async ({ page }) => {
+  test('shows Network view as default after sign-in (ADR-260088)', async ({ page }) => {
     await mockGraphQL(page)
-    await primeRelationshipEmphasis(page)
     await signIn(page)
 
     await expect(page.getByRole('tab', { name: 'Network' })).toHaveAttribute('aria-selected', 'true')
@@ -315,11 +319,12 @@ test.describe('Graph workspace', () => {
 
     // Scoped: the left-rail lens switcher (ADR-260064) is a second tablist on the page.
     await page.getByRole('tablist', { name: 'Graph view' }).focus()
+    await expect(page.getByRole('tab', { name: 'Network' })).toHaveAttribute('aria-selected', 'true')
+    await page.keyboard.press('ArrowRight')
     await expect(page.getByRole('tab', { name: 'Flow' })).toHaveAttribute('aria-selected', 'true')
     await page.keyboard.press('ArrowLeft')
     await expect(page.getByRole('tab', { name: 'Network' })).toHaveAttribute('aria-selected', 'true')
     await page.keyboard.press('ArrowRight')
-    await expect(page.getByRole('tab', { name: 'Flow' })).toHaveAttribute('aria-selected', 'true')
     await page.keyboard.press('ArrowRight')
     await expect(page.getByRole('tab', { name: 'Table' })).toHaveAttribute('aria-selected', 'true')
   })

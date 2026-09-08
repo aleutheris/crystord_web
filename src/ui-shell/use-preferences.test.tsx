@@ -9,7 +9,7 @@ describe('usePreferences', () => {
 
   it('defaults to compute emphasis and always-on badges (Q3 lean)', () => {
     const { result } = renderHook(() => usePreferences())
-    expect(result.current.homeEmphasis).toBe('compute')
+    expect(result.current.homeEmphasis).toBe('relationship')
     expect(result.current.computeBadges).toBe('always')
   })
 
@@ -29,7 +29,7 @@ describe('usePreferences', () => {
   it('falls back to the default for an invalid stored value', () => {
     localStorage.setItem('crystord-home-emphasis', 'bogus')
     const { result } = renderHook(() => usePreferences())
-    expect(result.current.homeEmphasis).toBe('compute')
+    expect(result.current.homeEmphasis).toBe('relationship')
   })
 
   it('defaults leftRailCollapsed to false and persists toggles', () => {
@@ -53,7 +53,7 @@ describe('usePreferences', () => {
       throw new Error('localStorage unavailable')
     })
     const { result } = renderHook(() => usePreferences())
-    expect(result.current.homeEmphasis).toBe('compute')
+    expect(result.current.homeEmphasis).toBe('relationship')
     expect(result.current.computeBadges).toBe('always')
     expect(result.current.leftRailCollapsed).toBe(false)
     expect(result.current.rightRailCollapsed).toBe(false)

@@ -500,12 +500,12 @@ describe('Application shell slot registries (ADR-260061 / EPIC-260066 T2)', () =
 })
 
 describe('Workspace preferences store (ADR-260061 / EPIC-260066 T4 / Q3)', () => {
-  it('preferences store exposes homeEmphasis/computeBadges with compute/always defaults', () => {
+  it('preferences store exposes homeEmphasis/computeBadges with relationship/always defaults', () => {
     const prefs = fs.readFileSync(path.join(SRC, 'ui-shell', 'use-preferences.ts'), 'utf-8')
     expect(prefs).toContain('homeEmphasis')
     expect(prefs).toContain('computeBadges')
-    // Q3 lean (compute-as-differentiator): defaults ship in the foundation, consumed by EPIC-260069.
-    expect(prefs).toMatch(/DEFAULT_HOME_EMPHASIS[^\n]*'compute'/)
+    // Network-as-default (ADR-260088, superseding ADR-260065 §7's `compute` default).
+    expect(prefs).toMatch(/DEFAULT_HOME_EMPHASIS[^\n]*'relationship'/)
     expect(prefs).toMatch(/DEFAULT_COMPUTE_BADGES[^\n]*'always'/)
   })
 
